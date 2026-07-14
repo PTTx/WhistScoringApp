@@ -137,25 +137,21 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
 
       <fieldset>
-        <legend>Active players (1+2 vs 3+4)</legend>
+        <legend>Aktive spillere</legend>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           {[0, 1, 2, 3].map(i => (
-            <div key={i}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 2 }}>
-                {i < 2 ? `Team A · ${i + 1}` : `Team B · ${i - 1}`}
-              </div>
-              <select
-                aria-label={`Active player ${i + 1}`}
-                value={active[i]}
-                onChange={e => handleSetActive(i, e.target.value)}
-                style={{ width: '100%' }}
-              >
-                <option value="">--</option>
-                {players.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              key={i}
+              aria-label={`Active player ${i + 1}`}
+              value={active[i]}
+              onChange={e => handleSetActive(i, e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">--</option>
+              {players.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           ))}
         </div>
       </fieldset>
@@ -163,7 +159,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       <div style={{ marginBottom: '1rem' }}>
         <label>
           <input type="checkbox" checked={isSol} onChange={e => setIsSol(e.target.checked)} />
-          Sol round
+          Sol melding
         </label>
       </div>
 
@@ -198,10 +194,18 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 ))}
               </select>
             </div>
-            <label>
-              <input type="checkbox" aria-label="Sol won" checked={solWon} onChange={e => setSolWon(e.target.checked)} />
-              Sol won
-            </label>
+            <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
+              <label>
+                <input type="radio" name="sol-result" value="won" checked={solWon}
+                  onChange={() => setSolWon(true)} />
+                {' '}Vundet
+              </label>
+              <label>
+                <input type="radio" name="sol-result" value="lost" checked={!solWon}
+                  onChange={() => setSolWon(false)} />
+                {' '}Tabt
+              </label>
+            </div>
           </div>
         </fieldset>
       ) : (

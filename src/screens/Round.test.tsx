@@ -82,10 +82,10 @@ describe('Round screen - Sol bid', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
     selectActivePlayers()
-    fireEvent.click(screen.getByText(/sol round/i))
+    fireEvent.click(screen.getByText(/sol melding/i))
     fireEvent.change(screen.getByLabelText(/sol player/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/sol type/i), { target: { value: 'ren' } })
-    fireEvent.click(screen.getByLabelText(/sol won/i))
+    fireEvent.click(screen.getByLabelText(/vundet/i))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: { type: 'sol', solPlayerId: 'p1', solType: 'ren', won: true },
