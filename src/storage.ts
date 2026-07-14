@@ -96,3 +96,8 @@ export function loadActiveGame(): GameRecord | null {
   const games = loadGames()
   return games.find(g => g.endedAt === null) ?? null
 }
+
+export function clearHistory(): void {
+  const active = loadActiveGame()
+  saveGames(active ? [active] : [])
+}
