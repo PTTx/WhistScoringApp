@@ -56,6 +56,7 @@ export default function App() {
         store.addPlayer(name)
         refresh()
       }}
+      onNewRound={() => setScreen('round')}
       onEnd={() => {
         store.endGame()
         refresh()

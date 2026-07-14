@@ -4,10 +4,11 @@ import type { GameRecord } from '../storage'
 interface Props {
   game: GameRecord
   onAddPlayer: (name: string) => void
+  onNewRound: () => void
   onEnd: () => void
 }
 
-export default function Scoreboard({ game, onAddPlayer, onEnd }: Props) {
+export default function Scoreboard({ game, onAddPlayer, onNewRound, onEnd }: Props) {
   const [newName, setNewName] = useState('')
 
   function handleAdd() {
@@ -81,6 +82,13 @@ export default function Scoreboard({ game, onAddPlayer, onEnd }: Props) {
           Add player
         </button>
       </div>
+
+      <button
+        onClick={onNewRound}
+        style={{ width: '100%', padding: '0.75rem', marginBottom: '0.5rem', background: '#2980b9', color: 'white', border: 'none', borderRadius: 4 }}
+      >
+        New Round
+      </button>
 
       <button
         onClick={onEnd}
