@@ -45,6 +45,7 @@ export interface Store {
   getGame(): GameRecord | null
   addPlayer(name: string): void
   recordRound(input: RecordRoundInput): void
+  editRound(index: number, input: RecordRoundInput): void
   endGame(): void
 }
 
@@ -155,6 +156,30 @@ export function createStore(): Store {
       }))
 
       current = { ...current, players: updatedPlayers, rounds: [...current.rounds, round] }
+      save()
+    },
+
+    editRound(index: number, input: RecordRoundInput) {
+      if (!current) throw new Error('No active game')
+      // Reverse the old round's deltas from player balances
+      const oldRound = current.rounds[index]
+      if (!oldRound) throw new Error(`No round at index ${index}`)
+      const oldDeltas = oldRound.bids[0]?.deltas ?? {}
+      const reversed = current.players.map(p => ({
+        ...p,
+        balance: Math.round((p.balance - (oldDeltas[p.id] ?? 0)) * 100) / 100,
+      }))
+      current = { ...current, players: reversed }
+      // Remove old round and re-record
+      current = { ...current, rounds: current.rounds.filter((_, i) => i !== index) }
+      // recordRound appends to the end - for editing we insert back at the same index
+      const self = (this as Store)
+      self.recordRound(input)
+      // Move the newly appended round back to the original index
+      const rounds = [...current!.rounds]
+      const newRound = rounds.pop()!
+      rounds.splice(index, 0, newRound)
+      current = { ...current!, rounds }
       save()
     },
 

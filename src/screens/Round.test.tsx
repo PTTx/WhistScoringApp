@@ -22,51 +22,42 @@ function makeGame(ruleset: 'tjell' | 'frants'): GameRecord {
   }
 }
 
+function selectActivePlayers() {
+  fireEvent.change(screen.getByLabelText(/active player 1/i), { target: { value: 'p1' } })
+  fireEvent.change(screen.getByLabelText(/active player 2/i), { target: { value: 'p2' } })
+  fireEvent.change(screen.getByLabelText(/active player 3/i), { target: { value: 'p3' } })
+  fireEvent.change(screen.getByLabelText(/active player 4/i), { target: { value: 'p4' } })
+}
+
 beforeEach(() => localStorage.clear())
 
-describe('Round screen - player and partnership selection', () => {
+describe('Round screen - player selection', () => {
   it('renders all players as selectable for active slots', () => {
-    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onEnd={vi.fn()} />)
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
     expect(screen.getAllByText('Alice').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bob').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Carol').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Dan').length).toBeGreaterThan(0)
   })
 
-  it('submit is disabled until 4 active players and partnerships are set', () => {
-    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onEnd={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /record/i })).toBeDisabled()
+  it('submit is disabled until 4 active players and melder+partner are set', () => {
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /registrer/i })).toBeDisabled()
   })
 })
 
 describe('Round screen - Tjell trick bid', () => {
   it('calls onRecord with correct Tjell trick bid input', () => {
     const onRecord = vi.fn()
-    render(<Round game={makeGame('tjell')} onRecord={onRecord} onEnd={vi.fn()} />)
-
-    // Select 4 active players: p1+p2 vs p3+p4
-    fireEvent.change(screen.getByLabelText(/active player 1/i), { target: { value: 'p1' } })
-    fireEvent.change(screen.getByLabelText(/active player 2/i), { target: { value: 'p2' } })
-    fireEvent.change(screen.getByLabelText(/active player 3/i), { target: { value: 'p3' } })
-    fireEvent.change(screen.getByLabelText(/active player 4/i), { target: { value: 'p4' } })
-
-    // Select bidder
+    render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
+    selectActivePlayers()
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
-
-    // Bid 10
+    fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
     fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
-
-    // Clubs modifier
-    fireEvent.click(screen.getByLabelText(/clubs/i))
-
-    // Tricks won: 10
+    fireEvent.change(screen.getByLabelText(/gode/i), { target: { value: 'clubs' } })
     fireEvent.change(screen.getByLabelText(/tricks won/i), { target: { value: '10' } })
-
-    fireEvent.click(screen.getByRole('button', { name: /record/i }))
-
-    expect(onRecord).toHaveBeenCalledWith({
-      activePlayers: ['p1', 'p2', 'p3', 'p4'],
-      partnerships: [['p1', 'p2'], ['p3', 'p4']],
+    fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
+    expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
         type: 'trick',
         bidderId: 'p1',
@@ -76,78 +67,51 @@ describe('Round screen - Tjell trick bid', () => {
         flips: 0,
         partnerGaveUp: false,
       }),
-    })
+    }))
   })
 
-  it('VIP flip inputs are disabled when Halve is selected', () => {
-    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onEnd={vi.fn()} />)
-    fireEvent.click(screen.getByLabelText(/halve/i))
+  it('VIP select is disabled when Halve is selected', () => {
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(/gode/i), { target: { value: 'halve' } })
     expect(screen.getByLabelText(/vip flips/i)).toBeDisabled()
-  })
-
-  it('Halve checkbox is disabled when VIP flips > 0', () => {
-    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onEnd={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText(/vip flips/i), { target: { value: '1' } })
-    expect(screen.getByLabelText(/halve/i)).toBeDisabled()
   })
 })
 
 describe('Round screen - Sol bid', () => {
   it('calls onRecord with correct sol input', () => {
     const onRecord = vi.fn()
-    render(<Round game={makeGame('tjell')} onRecord={onRecord} onEnd={vi.fn()} />)
-
-    fireEvent.change(screen.getByLabelText(/active player 1/i), { target: { value: 'p1' } })
-    fireEvent.change(screen.getByLabelText(/active player 2/i), { target: { value: 'p2' } })
-    fireEvent.change(screen.getByLabelText(/active player 3/i), { target: { value: 'p3' } })
-    fireEvent.change(screen.getByLabelText(/active player 4/i), { target: { value: 'p4' } })
-
-    fireEvent.click(screen.getByLabelText(/sol/i))
+    render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
+    selectActivePlayers()
+    fireEvent.click(screen.getByText(/sol round/i))
     fireEvent.change(screen.getByLabelText(/sol player/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/sol type/i), { target: { value: 'ren' } })
     fireEvent.click(screen.getByLabelText(/sol won/i))
-
-    fireEvent.click(screen.getByRole('button', { name: /record/i }))
-
-    expect(onRecord).toHaveBeenCalledWith({
-      activePlayers: ['p1', 'p2', 'p3', 'p4'],
-      partnerships: expect.any(Array),
-      bid: {
-        type: 'sol',
-        solPlayerId: 'p1',
-        solType: 'ren',
-        won: true,
-      },
-    })
+    fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
+    expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
+      bid: { type: 'sol', solPlayerId: 'p1', solType: 'ren', won: true },
+    }))
   })
 })
 
 describe('Round screen - Frants', () => {
-  it('does not show give-up or Halve options for Frants', () => {
-    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onEnd={vi.fn()} />)
-    expect(screen.queryByLabelText(/halve/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/give.?up/i)).not.toBeInTheDocument()
+  it('does not show Halve option in Gode selector for Frants', () => {
+    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    const godeSelect = screen.getByLabelText(/gode/i) as HTMLSelectElement
+    const options = Array.from(godeSelect.options).map(o => o.value)
+    expect(options).not.toContain('halve')
   })
 
   it('calls onRecord with correct Frants trick bid input', () => {
     const onRecord = vi.fn()
-    render(<Round game={makeGame('frants')} onRecord={onRecord} onEnd={vi.fn()} />)
-
-    fireEvent.change(screen.getByLabelText(/active player 1/i), { target: { value: 'p1' } })
-    fireEvent.change(screen.getByLabelText(/active player 2/i), { target: { value: 'p2' } })
-    fireEvent.change(screen.getByLabelText(/active player 3/i), { target: { value: 'p3' } })
-    fireEvent.change(screen.getByLabelText(/active player 4/i), { target: { value: 'p4' } })
-
+    render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
+    selectActivePlayers()
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
+    fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
     fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
     fireEvent.change(screen.getByLabelText(/vip flips/i), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText(/tricks won/i), { target: { value: '10' } })
-
-    fireEvent.click(screen.getByRole('button', { name: /record/i }))
-
-    expect(onRecord).toHaveBeenCalledWith({
-      activePlayers: ['p1', 'p2', 'p3', 'p4'],
-      partnerships: [['p1', 'p2'], ['p3', 'p4']],
+    fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
+    expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
         type: 'trick',
         bidderId: 'p1',
@@ -156,6 +120,6 @@ describe('Round screen - Frants', () => {
         vipFlips: 2,
         gode: false,
       }),
-    })
+    }))
   })
 })

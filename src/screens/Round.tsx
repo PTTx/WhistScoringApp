@@ -4,70 +4,128 @@ import type { RecordRoundInput } from '../store'
 
 interface Props {
   game: GameRecord
+  defaultActive?: string[]
+  editingRoundIndex?: number | null
   onRecord: (input: RecordRoundInput) => void
-  onEnd: () => void
+  onBack: () => void
 }
 
 const SOL_TYPES = [
-  { value: 'normal', label: 'Normal Sol (0.50 / 2.00)' },
-  { value: 'ren', label: 'Ren Sol (1.00 / 4.00)' },
-  { value: 'bord', label: 'På bordet (1.50 / 8.00)' },
-  { value: 'bord-clean', label: 'På bordet uden stik (2.00 / 16.00)' },
+  { value: 'normal', label: 'Normal Sol' },
+  { value: 'ren', label: 'Ren Sol' },
+  { value: 'bord', label: 'På bordet' },
+  { value: 'bord-clean', label: 'På bordet uden stik' },
 ]
 
-export default function Round({ game, onRecord, onEnd }: Props) {
+const TRICK_OPTIONS_TJELL = [7, 8, 9, 10, 11, 12, 13]
+const TRICK_OPTIONS_FRANTS = [8, 9, 10, 11, 12, 13]
+const GODE_OPTIONS = [
+  { value: 'none', label: 'Alm' },
+  { value: 'clubs', label: 'Klør (clubs)' },
+  { value: 'sans', label: 'Sans trumpf' },
+  { value: 'halve', label: 'Halve' },
+]
+const GODE_OPTIONS_FRANTS = [
+  { value: 'none', label: 'Alm' },
+  { value: 'gode', label: 'Gode/Halve' },
+]
+
+const VIP_OPTIONS = [
+  { value: '0', label: 'Ingen VIP' },
+  { value: '1', label: 'VIP 1 flip' },
+  { value: '2', label: 'VIP 2 flips' },
+  { value: '3', label: 'VIP 3 flips' },
+]
+
+function s(id: string, players: GameRecord['players']) {
+  return players.find(p => p.id === id)?.name ?? id
+}
+
+export default function Round({ game, defaultActive, editingRoundIndex, onRecord, onBack }: Props) {
+  const editingRound = editingRoundIndex != null ? game.rounds[editingRoundIndex] : null
+  const editingBid = editingRound?.bids[0] ?? null
   const { players, ruleset } = game
   const isTjell = ruleset === 'tjell'
+  const trickOptions = isTjell ? TRICK_OPTIONS_TJELL : TRICK_OPTIONS_FRANTS
+  const godeOptions = isTjell ? GODE_OPTIONS : GODE_OPTIONS_FRANTS
 
-  const [active, setActive] = useState<string[]>(['', '', '', ''])
-  const [isSol, setIsSol] = useState(false)
+  const initActive = editingRound
+    ? editingRound.activePlayers.length === 4
+      ? editingRound.activePlayers
+      : [...editingRound.activePlayers, ...Array(4 - editingRound.activePlayers.length).fill('')]
+    : (defaultActive ?? ['', '', '', ''])
 
-  // Trick bid state
-  const [bidderId, setBidderId] = useState('')
-  const [tricksBid, setTricksBid] = useState(isTjell ? 7 : 8)
-  const [tricksWon, setTricksWon] = useState(isTjell ? 7 : 8)
-  const [clubs, setClubs] = useState(false)
-  const [sans, setSans] = useState(false)
-  const [halve, setHalve] = useState(false)
+  const [active, setActive] = useState<string[]>(initActive)
+  const [isSol, setIsSol] = useState(editingBid?.type === 'sol')
+
+  // Trick bid
+  const [melderId, setMelderId] = useState(editingBid?.bidderId ?? '')
+  const [partnerId, setPartnerId] = useState(() => {
+    if (!editingBid || editingBid.type === 'sol') return ''
+    const p = editingRound?.partnerships.find(ps => ps.includes(editingBid.bidderId ?? ''))
+    const partner = p?.find(id => id !== editingBid.bidderId)
+    return partner ?? (editingBid.partnerGaveUp ? 'self' : '')
+  })
+  const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? trickOptions[3])
+  const [gode, setGode] = useState('none')
   const [vipFlips, setVipFlips] = useState(0)
-  const [partnerGaveUp, setPartnerGaveUp] = useState(false)
+  const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? trickOptions[3])
 
-  // Sol state
-  const [solPlayerId, setSolPlayerId] = useState('')
-  const [solType, setSolType] = useState<'normal' | 'ren' | 'bord' | 'bord-clean'>('normal')
-  const [solWon, setSolWon] = useState(false)
+  // Sol
+  const [solPlayerId, setSolPlayerId] = useState(editingBid?.type === 'sol' ? editingBid.bidderId : '')
+  const [solType, setSolType] = useState<'normal' | 'ren' | 'bord' | 'bord-clean'>(
+    editingBid?.type === 'sol' ? (editingBid.solType ?? 'normal') : 'normal'
+  )
+  const [solWon, setSolWon] = useState(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : false)
 
   const activeFilled = active.every(id => id !== '')
-  const partnerships: [string[], string[]] = [[active[0], active[1]], [active[2], active[3]]]
+  const activePlayers = active.filter(Boolean)
 
-  const gode = isTjell ? (clubs ? 1 : 0) + (sans ? 1 : 0) + (halve ? 1 : 0) : undefined
-  const godeFrants = !isTjell ? clubs || sans : undefined
+  // Partnership derived from melder + partner selection
+  // 'self' means melder is alone - partner gave up / no partner
+  const partnerGaveUp = partnerId === 'self'
+  const melderPartner = partnerGaveUp ? null : partnerId
+  const opponentIds = activePlayers.filter(id => id !== melderId && id !== melderPartner)
+  const partnerships: [string[], string[]] = partnerGaveUp
+    ? [[melderId], opponentIds]
+    : [[melderId, melderPartner ?? ''].filter(Boolean), opponentIds]
 
   const canRecord = activeFilled && (isSol
     ? solPlayerId !== ''
-    : bidderId !== '')
+    : melderId !== '' && partnerId !== '')
 
   function handleSetActive(index: number, value: string) {
     setActive(prev => prev.map((v, i) => i === index ? value : v))
   }
 
+  function calcGodeValue(): { godeNum: number; godeBool: boolean } {
+    if (isTjell) {
+      if (gode === 'clubs' || gode === 'sans') return { godeNum: 1, godeBool: true }
+      if (gode === 'halve') return { godeNum: 1, godeBool: true }
+      return { godeNum: 0, godeBool: false }
+    }
+    return { godeNum: 0, godeBool: gode === 'gode' }
+  }
+
   function handleRecord() {
     if (!canRecord) return
+    const { godeNum, godeBool } = calcGodeValue()
+
     if (isSol) {
       onRecord({
-        activePlayers: active,
+        activePlayers,
         partnerships,
         bid: { type: 'sol', solPlayerId, solType, won: solWon },
       })
     } else if (isTjell) {
       onRecord({
-        activePlayers: active,
-        partnerships,
+        activePlayers,
+        partnerships: [[melderId, ...(melderPartner ? [melderPartner] : [])], opponentIds],
         bid: {
           type: 'trick',
-          bidderId,
-          flips: vipFlips,
-          gode: gode!,
+          bidderId: melderId,
+          flips: gode === 'halve' ? 0 : vipFlips,
+          gode: godeNum,
           tricksBid,
           tricksWon,
           partnerGaveUp,
@@ -75,13 +133,13 @@ export default function Round({ game, onRecord, onEnd }: Props) {
       })
     } else {
       onRecord({
-        activePlayers: active,
-        partnerships,
+        activePlayers,
+        partnerships: [[melderId, ...(melderPartner ? [melderPartner] : [])], opponentIds],
         bid: {
           type: 'trick',
-          bidderId,
+          bidderId: melderId,
           vipFlips,
-          gode: godeFrants!,
+          gode: godeBool,
           tricksBid,
           tricksWon,
         },
@@ -89,212 +147,185 @@ export default function Round({ game, onRecord, onEnd }: Props) {
     }
   }
 
-  const minBid = isTjell ? 7 : 8
+  const halveSelected = isTjell && gode === 'halve'
 
   return (
-    <div style={{ padding: '1rem', maxWidth: 400 }}>
-      <h2>New Round</h2>
+    <div style={{ padding: '1rem', maxWidth: 440 }}>
+      <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '0 0 0.75rem', fontSize: '0.9rem' }}>
+        ← Back
+      </button>
+      <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
 
-      <fieldset style={{ marginBottom: '1rem' }}>
-        <legend>Active players</legend>
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} style={{ marginBottom: 4 }}>
-            <label htmlFor={`active-${i + 1}`}>Active player {i + 1}</label>
-            <select
-              id={`active-${i + 1}`}
-              value={active[i]}
-              onChange={e => handleSetActive(i, e.target.value)}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            >
-              <option value="">-- select --</option>
-              {players.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-        <small style={{ color: '#666' }}>Players 1+2 vs Players 3+4</small>
+      <fieldset>
+        <legend>Active players (1+2 vs 3+4)</legend>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 2 }}>
+                {i < 2 ? `Team A · ${i + 1}` : `Team B · ${i - 1}`}
+              </div>
+              <select
+                aria-label={`Active player ${i + 1}`}
+                value={active[i]}
+                onChange={e => handleSetActive(i, e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">--</option>
+                {players.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
       </fieldset>
 
       <div style={{ marginBottom: '1rem' }}>
         <label>
-          <input
-            type="checkbox"
-            aria-label="Sol"
-            checked={isSol}
-            onChange={e => setIsSol(e.target.checked)}
-          />
-          {' '}Sol round
+          <input type="checkbox" checked={isSol} onChange={e => setIsSol(e.target.checked)} />
+          Sol round
         </label>
       </div>
 
       {isSol ? (
-        <fieldset style={{ marginBottom: '1rem' }}>
+        <fieldset>
           <legend>Sol</legend>
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="sol-player">Sol player</label>
-            <select
-              id="sol-player"
-              value={solPlayerId}
-              onChange={e => setSolPlayerId(e.target.value)}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            >
-              <option value="">-- select --</option>
-              {active.filter(Boolean).map(id => {
-                const p = players.find(pl => pl.id === id)!
-                return <option key={id} value={id}>{p?.name}</option>
-              })}
-            </select>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Sol player</div>
+              <select
+                aria-label="Sol player"
+                value={solPlayerId}
+                onChange={e => setSolPlayerId(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">--</option>
+                {activePlayers.map(id => (
+                  <option key={id} value={id}>{s(id, players)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Sol type</div>
+              <select
+                aria-label="Sol type"
+                value={solType}
+                onChange={e => setSolType(e.target.value as typeof solType)}
+                style={{ width: '100%' }}
+              >
+                {SOL_TYPES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <label>
+              <input type="checkbox" aria-label="Sol won" checked={solWon} onChange={e => setSolWon(e.target.checked)} />
+              Sol won
+            </label>
           </div>
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="sol-type">Sol type</label>
-            <select
-              id="sol-type"
-              value={solType}
-              onChange={e => setSolType(e.target.value as typeof solType)}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            >
-              {SOL_TYPES.map(s => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="Sol won"
-              checked={solWon}
-              onChange={e => setSolWon(e.target.checked)}
-            />
-            {' '}Sol won
-          </label>
         </fieldset>
       ) : (
-        <fieldset style={{ marginBottom: '1rem' }}>
-          <legend>Trick bid</legend>
-
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="bidder">Bidder</label>
-            <select
-              id="bidder"
-              value={bidderId}
-              onChange={e => setBidderId(e.target.value)}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            >
-              <option value="">-- select --</option>
-              {active.filter(Boolean).map(id => {
-                const p = players.find(pl => pl.id === id)!
-                return <option key={id} value={id}>{p?.name}</option>
-              })}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="tricks-bid">Tricks bid</label>
-            <input
-              id="tricks-bid"
-              type="number"
-              min={minBid}
-              max={13}
-              value={tricksBid}
-              onChange={e => setTricksBid(Number(e.target.value))}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 4 }}>
-            <label>
-              <input
-                type="checkbox"
-                aria-label="Clubs"
-                checked={clubs}
-                onChange={e => setClubs(e.target.checked)}
-              />
-              {' '}Clubs
-            </label>
-            {' '}
-            <label>
-              <input
-                type="checkbox"
-                aria-label="Sans"
-                checked={sans}
-                onChange={e => setSans(e.target.checked)}
-              />
-              {' '}Sans trumpf
-            </label>
-          </div>
-
-          {isTjell && (
-            <div style={{ marginBottom: 4 }}>
-              <label>
-                <input
-                  type="checkbox"
-                  aria-label="Halve"
-                  checked={halve}
-                  disabled={vipFlips > 0}
-                  onChange={e => setHalve(e.target.checked)}
-                />
-                {' '}Halve
-              </label>
+        <>
+          <fieldset>
+            <legend>Melding</legend>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Melder</div>
+                <select
+                  aria-label="Bidder"
+                  value={melderId}
+                  onChange={e => { setMelderId(e.target.value); setPartnerId('') }}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">--</option>
+                  {activePlayers.map(id => (
+                    <option key={id} value={id}>{s(id, players)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Makker</div>
+                <select
+                  aria-label="Makker"
+                  value={partnerId}
+                  onChange={e => setPartnerId(e.target.value)}
+                  disabled={!melderId}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">--</option>
+                  <option value="self">Selv (ingen makker)</option>
+                  {activePlayers.filter(id => id !== melderId).map(id => (
+                    <option key={id} value={id}>{s(id, players)}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-          )}
 
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="vip-flips">VIP flips</label>
-            <input
-              id="vip-flips"
-              type="number"
-              min={0}
-              max={3}
-              value={vipFlips}
-              disabled={isTjell && halve}
-              onChange={e => setVipFlips(Number(e.target.value))}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            />
-          </div>
-
-          {isTjell && (
-            <div style={{ marginBottom: 4 }}>
-              <label>
-                <input
-                  type="checkbox"
-                  aria-label="Give-up"
-                  checked={partnerGaveUp}
-                  onChange={e => setPartnerGaveUp(e.target.checked)}
-                />
-                {' '}Partner gave up
-              </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
+                <select
+                  aria-label="Tricks bid"
+                  value={tricksBid}
+                  onChange={e => setTricksBid(Number(e.target.value))}
+                  style={{ width: '100%' }}
+                >
+                  {trickOptions.map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Gode</div>
+                <select
+                  aria-label="Gode"
+                  value={gode}
+                  onChange={e => { setGode(e.target.value); if (e.target.value === 'halve') setVipFlips(0) }}
+                  style={{ width: '100%' }}
+                >
+                  {godeOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>VIP</div>
+                <select
+                  aria-label="VIP flips"
+                  value={vipFlips}
+                  onChange={e => setVipFlips(Number(e.target.value))}
+                  disabled={halveSelected}
+                  style={{ width: '100%' }}
+                >
+                  {VIP_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-          )}
+          </fieldset>
 
-          <div style={{ marginBottom: 4 }}>
-            <label htmlFor="tricks-won">Tricks won</label>
-            <input
-              id="tricks-won"
-              type="number"
-              min={0}
-              max={13}
-              value={tricksWon}
-              onChange={e => setTricksWon(Number(e.target.value))}
-              style={{ display: 'block', width: '100%', padding: '0.4rem' }}
-            />
-          </div>
-        </fieldset>
+          <fieldset>
+            <legend>Resultat</legend>
+            <div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik vundet af melder</div>
+              <select
+                aria-label="Tricks won"
+                value={tricksWon}
+                onChange={e => setTricksWon(Number(e.target.value))}
+                style={{ width: '100%' }}
+              >
+                {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </fieldset>
+        </>
       )}
 
-      <button
-        onClick={handleRecord}
-        disabled={!canRecord}
-        style={{ width: '100%', padding: '0.75rem', marginBottom: '0.5rem' }}
-      >
-        Record Round
-      </button>
-
-      <button
-        onClick={onEnd}
-        style={{ width: '100%', padding: '0.5rem', background: 'transparent', border: '1px solid #ccc' }}
-      >
-        End Game
+      <button onClick={handleRecord} disabled={!canRecord} style={{ width: '100%', padding: '0.75rem', fontSize: '1.1rem' }}>
+        {editingRound ? 'Gem ændringer' : 'Registrer runde'}
       </button>
     </div>
   )

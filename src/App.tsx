@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createStore } from './store'
 import type { GameRecord } from './storage'
 import Setup from './screens/Setup'
@@ -12,14 +12,12 @@ const store = createStore()
 export default function App() {
   const [game, setGame] = useState<GameRecord | null>(store.getGame())
   const [screen, setScreen] = useState<Screen>(store.getGame() ? 'scoreboard' : 'setup')
+  const [lastActive, setLastActive] = useState<string[]>(['', '', '', ''])
+  const [editingRound, setEditingRound] = useState<number | null>(null)
 
   function refresh() {
     setGame(store.getGame())
   }
-
-  useEffect(() => {
-    refresh()
-  }, [])
 
   if (screen === 'setup') {
     return (
@@ -39,12 +37,20 @@ export default function App() {
     return (
       <Round
         game={game}
+        defaultActive={lastActive}
+        editingRoundIndex={editingRound}
         onRecord={input => {
-          store.recordRound(input)
+          if (editingRound !== null) {
+            store.editRound(editingRound, input)
+            setEditingRound(null)
+          } else {
+            store.recordRound(input)
+          }
+          setLastActive(input.activePlayers)
           refresh()
           setScreen('scoreboard')
         }}
-        onEnd={() => setScreen('scoreboard')}
+        onBack={() => { setEditingRound(null); setScreen('scoreboard') }}
       />
     )
   }
@@ -52,16 +58,10 @@ export default function App() {
   return (
     <Scoreboard
       game={game}
-      onAddPlayer={name => {
-        store.addPlayer(name)
-        refresh()
-      }}
+      onAddPlayer={name => { store.addPlayer(name); refresh() }}
       onNewRound={() => setScreen('round')}
-      onEnd={() => {
-        store.endGame()
-        refresh()
-        setScreen('setup')
-      }}
+      onEditRound={index => { setEditingRound(index); setScreen('round') }}
+      onEnd={() => { store.endGame(); refresh(); setScreen('setup') }}
     />
   )
 }
