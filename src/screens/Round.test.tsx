@@ -89,9 +89,10 @@ describe('Round screen - Sol bid', () => {
 })
 
 describe('Round screen - Frants', () => {
-  it('does not show Halve checkbox for Frants', () => {
+  it('does not show separate Halve checkbox for Frants (Halve is part of Gode)', () => {
     render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    expect(screen.queryByLabelText(/halve/i)).not.toBeInTheDocument()
+    // Frants has no separate Halve checkbox - it is covered by the Gode checkbox
+    expect(screen.queryByLabelText(/^halve$/i)).not.toBeInTheDocument()
   })
 
   it('calls onRecord with correct Frants trick bid input', () => {
@@ -112,6 +113,7 @@ describe('Round screen - Frants', () => {
         tricksWon: 10,
         vipFlips: 2,
         gode: false,
+        partnerGaveUp: false,
       }),
     }))
   })

@@ -114,6 +114,7 @@ describe('recordRound - frants trick bid', () => {
         gode: false,
         tricksBid: 10,
         tricksWon: 10,
+        partnerGaveUp: false,
       },
     })
 

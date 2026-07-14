@@ -55,6 +55,7 @@ describe('settleTrickBid (Frants)', () => {
       tricksWon: 10,
       bidderId: 'p1',
       partnerships: [['p1', 'p2'], ['p3', 'p4']],
+      partnerGaveUp: false,
     })
     expect(result).toEqual({ p1: 2.00, p2: 2.00, p3: -2.00, p4: -2.00 })
   })
@@ -66,6 +67,7 @@ describe('settleTrickBid (Frants)', () => {
       tricksWon: 11,
       bidderId: 'p1',
       partnerships: [['p1', 'p2'], ['p3', 'p4']],
+      partnerGaveUp: false,
     })
     expect(result).toEqual({ p1: 4.00, p2: 4.00, p3: -4.00, p4: -4.00 })
   })
@@ -77,8 +79,21 @@ describe('settleTrickBid (Frants)', () => {
       tricksWon: 9,
       bidderId: 'p1',
       partnerships: [['p1', 'p2'], ['p3', 'p4']],
+      partnerGaveUp: false,
     })
     expect(result).toEqual({ p1: -2.00, p2: -2.00, p3: 2.00, p4: 2.00 })
+  })
+
+  it('selv (partnerGaveUp): melder wins ×3, each opponent loses ×1, zero-sum', () => {
+    const result = settleTrickBid({
+      bidPrice: 2.00,
+      tricksBid: 10,
+      tricksWon: 10,
+      bidderId: 'p1',
+      partnerships: [['p1'], ['p2', 'p3', 'p4']],
+      partnerGaveUp: true,
+    })
+    expect(result).toEqual({ p1: 6.00, p2: -2.00, p3: -2.00, p4: -2.00 })
   })
 })
 

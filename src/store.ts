@@ -23,6 +23,7 @@ export type FrantsBidInput = {
   gode: boolean
   tricksBid: number
   tricksWon: number
+  partnerGaveUp: boolean
 }
 
 export type SolBidInput = {
@@ -135,14 +136,15 @@ export function createStore(): Store {
           tricksWon: frantsBid.tricksWon,
           bidderId: frantsBid.bidderId,
           partnerships,
+          partnerGaveUp: frantsBid.partnerGaveUp,
         })
       }
 
       const bidRecord: BidRecord = {
         type: bid.type,
         bidderId: bid.type !== 'sol' ? bid.bidderId : bid.solPlayerId,
-        partnerGaveUp: bid.type === 'trick' && current.ruleset === 'tjell'
-          ? (bid as TjellBidInput).partnerGaveUp
+        partnerGaveUp: bid.type === 'trick'
+          ? (bid as TjellBidInput | FrantsBidInput).partnerGaveUp
           : false,
         deltas,
         ...(bid.type === 'trick' && {

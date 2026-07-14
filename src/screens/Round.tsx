@@ -139,6 +139,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           gode,
           tricksBid,
           tricksWon,
+          partnerGaveUp,
         },
       })
     }
@@ -312,7 +313,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                   checked={gode}
                   onChange={e => setGode(e.target.checked)}
                 />
-                {' '}Gode (klør / uden trumf)
+                {' '}Gode ({isTjell ? 'klør / uden trumf' : 'klør / uden trumf / Halve'})
               </label>
               {isTjell && (
                 <label>

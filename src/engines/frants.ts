@@ -34,6 +34,7 @@ export interface TrickBidSettlementInput {
   tricksWon: number
   bidderId: string
   partnerships: [string[], string[]]
+  partnerGaveUp: boolean
 }
 
 export function settleTrickBid({
@@ -42,6 +43,7 @@ export function settleTrickBid({
   tricksWon,
   bidderId,
   partnerships,
+  partnerGaveUp,
 }: TrickBidSettlementInput): Record<string, number> {
   const diff = tricksWon - tricksBid
   const multiplier = diff >= 0 ? 1 + diff : -diff
@@ -54,8 +56,15 @@ export function settleTrickBid({
 
   const sign = bidderWins ? 1 : -1
   const deltas: Record<string, number> = {}
-  for (const id of bidderPartnership) deltas[id] = round2(sign * amount)
-  for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
+
+  if (partnerGaveUp) {
+    // Melder is alone: settles individually against all three; each pays/receives amount
+    deltas[bidderId] = round2(sign * amount * 3)
+    for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
+  } else {
+    for (const id of bidderPartnership) deltas[id] = round2(sign * amount)
+    for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
+  }
 
   return deltas
 }
