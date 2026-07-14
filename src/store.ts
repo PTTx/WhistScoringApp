@@ -1,6 +1,6 @@
 import { calcTjellBidPrice, settleTrickBid as tjellSettleTrick, settleSol as tjellSettleSol } from './engines/tjell'
 import { calcFrantsBidPrice, settleTrickBid as frantsSettleTrick, settleSol as frantsSettleSol } from './engines/frants'
-import { GameRecord, PlayerRecord, RoundRecord, BidRecord, SCHEMA_VERSION, loadGames, saveGame, loadActiveGame } from './storage'
+import { GameRecord, PlayerRecord, RoundRecord, BidRecord, SCHEMA_VERSION, saveGame, loadActiveGame } from './storage'
 
 function generateId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
