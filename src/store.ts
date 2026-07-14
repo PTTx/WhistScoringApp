@@ -1,6 +1,6 @@
 import { calcTjellBidPrice, settleTrickBid as tjellSettleTrick, settleSol as tjellSettleSol } from './engines/tjell'
 import { calcFrantsBidPrice, settleTrickBid as frantsSettleTrick, settleSol as frantsSettleSol } from './engines/frants'
-import { GameRecord, PlayerRecord, RoundRecord, BidRecord, SCHEMA_VERSION, saveGame, loadActiveGame } from './storage'
+import { GameRecord, PlayerRecord, RoundRecord, BidRecord, SCHEMA_VERSION, saveGame, loadActiveGame, addKnownPlayers } from './storage'
 
 function generateId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -44,6 +44,7 @@ export interface Store {
   startGame(opts: { ruleset: 'tjell' | 'frants'; playerNames: string[] }): void
   getGame(): GameRecord | null
   addPlayer(name: string): void
+  renamePlayer(playerId: string, newName: string): void
   recordRound(input: RecordRoundInput): void
   editRound(index: number, input: RecordRoundInput): void
   endGame(): void
@@ -58,6 +59,7 @@ export function createStore(): Store {
 
   return {
     startGame({ ruleset, playerNames }) {
+      addKnownPlayers(playerNames)
       current = {
         schemaVersion: SCHEMA_VERSION,
         id: generateId(),
@@ -76,8 +78,19 @@ export function createStore(): Store {
 
     addPlayer(name: string) {
       if (!current) throw new Error('No active game')
+      addKnownPlayers([name])
       const player: PlayerRecord = { id: generateId(), name, balance: 0 }
       current = { ...current, players: [...current.players, player] }
+      save()
+    },
+
+    renamePlayer(playerId: string, newName: string) {
+      if (!current) throw new Error('No active game')
+      addKnownPlayers([newName])
+      current = {
+        ...current,
+        players: current.players.map(p => p.id === playerId ? { ...p, name: newName } : p),
+      }
       save()
     },
 

@@ -4,6 +4,7 @@ import type { GameRecord, RoundRecord } from '../storage'
 interface Props {
   game: GameRecord
   onAddPlayer: (name: string) => void
+  onRenamePlayer: (playerId: string, newName: string) => void
   onNewRound: () => void
   onEditRound: (roundIndex: number) => void
   onEnd: () => void
@@ -35,9 +36,11 @@ function roundSummary(round: RoundRecord, game: GameRecord) {
   return { melder, makker, label: `Bud ${bid.tricksBid} · vandt ${bid.tricksWon} (${result})`, price }
 }
 
-export default function Scoreboard({ game, onAddPlayer, onNewRound, onEditRound, onEnd }: Props) {
+export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRound, onEditRound, onEnd }: Props) {
   const [newName, setNewName] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
+  const [editingPlayerName, setEditingPlayerName] = useState('')
 
   function handleAdd() {
     if (!newName.trim()) return
@@ -64,7 +67,36 @@ export default function Scoreboard({ game, onAddPlayer, onNewRound, onEditRound,
         <tbody>
           {sorted.map(p => (
             <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-              <td style={{ padding: '0.5rem 0.25rem' }}>{p.name}</td>
+              <td style={{ padding: '0.4rem 0.25rem' }}>
+                {editingPlayerId === p.id ? (
+                  <form
+                    style={{ display: 'flex', gap: '0.3rem' }}
+                    onSubmit={e => {
+                      e.preventDefault()
+                      const trimmed = editingPlayerName.trim()
+                      if (trimmed) onRenamePlayer(p.id, trimmed)
+                      setEditingPlayerId(null)
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={editingPlayerName}
+                      onChange={e => setEditingPlayerName(e.target.value)}
+                      onBlur={() => setEditingPlayerId(null)}
+                      style={{ flex: 1, padding: '0.25rem 0.4rem', fontSize: '1rem' }}
+                    />
+                    <button type="submit" style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}>✓</button>
+                  </form>
+                ) : (
+                  <span
+                    onClick={() => { setEditingPlayerId(p.id); setEditingPlayerName(p.name) }}
+                    style={{ cursor: 'pointer', borderBottom: '1px dashed var(--border)' }}
+                    title="Tryk for at omdøbe"
+                  >
+                    {p.name}
+                  </span>
+                )}
+              </td>
               <td style={{
                 padding: '0.5rem 0.25rem',
                 textAlign: 'right',

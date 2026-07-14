@@ -59,6 +59,7 @@ export default function App() {
     <Scoreboard
       game={game}
       onAddPlayer={name => { store.addPlayer(name); refresh() }}
+      onRenamePlayer={(id, name) => { store.renamePlayer(id, name); refresh() }}
       onNewRound={() => setScreen('round')}
       onEditRound={index => { setEditingRound(index); setScreen('round') }}
       onEnd={() => { store.endGame(); refresh(); setScreen('setup') }}

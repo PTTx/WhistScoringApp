@@ -40,6 +40,26 @@ export interface GameRecord {
 }
 
 const STORAGE_KEY = 'whist_games'
+const KNOWN_PLAYERS_KEY = 'whist_known_players'
+
+export function loadKnownPlayers(): string[] {
+  try {
+    const raw = localStorage.getItem(KNOWN_PLAYERS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveKnownPlayers(names: string[]): void {
+  localStorage.setItem(KNOWN_PLAYERS_KEY, JSON.stringify(names))
+}
+
+export function addKnownPlayers(names: string[]): void {
+  const existing = new Set(loadKnownPlayers())
+  for (const n of names) if (n.trim()) existing.add(n.trim())
+  saveKnownPlayers([...existing].sort())
+}
 
 function migrate(raw: unknown): GameRecord[] {
   if (!Array.isArray(raw)) return []

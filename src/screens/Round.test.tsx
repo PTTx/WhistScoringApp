@@ -54,7 +54,7 @@ describe('Round screen - Tjell trick bid', () => {
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
     fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText(/gode/i), { target: { value: 'clubs' } })
+    fireEvent.click(screen.getByLabelText(/gode/i))
     fireEvent.change(screen.getByLabelText(/tricks won/i), { target: { value: '10' } })
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -72,7 +72,7 @@ describe('Round screen - Tjell trick bid', () => {
 
   it('VIP select is disabled when Halve is selected', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText(/gode/i), { target: { value: 'halve' } })
+    fireEvent.click(screen.getByLabelText(/halve/i))
     expect(screen.getByLabelText(/vip flips/i)).toBeDisabled()
   })
 })
@@ -94,11 +94,9 @@ describe('Round screen - Sol bid', () => {
 })
 
 describe('Round screen - Frants', () => {
-  it('does not show Halve option in Gode selector for Frants', () => {
+  it('does not show Halve checkbox for Frants', () => {
     render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    const godeSelect = screen.getByLabelText(/gode/i) as HTMLSelectElement
-    const options = Array.from(godeSelect.options).map(o => o.value)
-    expect(options).not.toContain('halve')
+    expect(screen.queryByLabelText(/halve/i)).not.toBeInTheDocument()
   })
 
   it('calls onRecord with correct Frants trick bid input', () => {

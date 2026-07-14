@@ -19,16 +19,6 @@ const SOL_TYPES = [
 
 const TRICK_OPTIONS_TJELL = [7, 8, 9, 10, 11, 12, 13]
 const TRICK_OPTIONS_FRANTS = [8, 9, 10, 11, 12, 13]
-const GODE_OPTIONS = [
-  { value: 'none', label: 'Alm' },
-  { value: 'clubs', label: 'Klør (clubs)' },
-  { value: 'sans', label: 'Sans trumpf' },
-  { value: 'halve', label: 'Halve' },
-]
-const GODE_OPTIONS_FRANTS = [
-  { value: 'none', label: 'Alm' },
-  { value: 'gode', label: 'Gode/Halve' },
-]
 
 const VIP_OPTIONS = [
   { value: '0', label: 'Ingen VIP' },
@@ -47,7 +37,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const { players, ruleset } = game
   const isTjell = ruleset === 'tjell'
   const trickOptions = isTjell ? TRICK_OPTIONS_TJELL : TRICK_OPTIONS_FRANTS
-  const godeOptions = isTjell ? GODE_OPTIONS : GODE_OPTIONS_FRANTS
 
   const initActive = editingRound
     ? editingRound.activePlayers.length === 4
@@ -67,7 +56,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     return partner ?? (editingBid.partnerGaveUp ? 'self' : '')
   })
   const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? trickOptions[3])
-  const [gode, setGode] = useState('none')
+  const [gode, setGode] = useState(false)   // klør / uden trumf
+  const [halve, setHalve] = useState(false) // Halve (Tjell only, mutually exclusive with VIP)
   const [vipFlips, setVipFlips] = useState(0)
   const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? trickOptions[3])
 
@@ -98,18 +88,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     setActive(prev => prev.map((v, i) => i === index ? value : v))
   }
 
-  function calcGodeValue(): { godeNum: number; godeBool: boolean } {
-    if (isTjell) {
-      if (gode === 'clubs' || gode === 'sans') return { godeNum: 1, godeBool: true }
-      if (gode === 'halve') return { godeNum: 1, godeBool: true }
-      return { godeNum: 0, godeBool: false }
-    }
-    return { godeNum: 0, godeBool: gode === 'gode' }
-  }
-
   function handleRecord() {
     if (!canRecord) return
-    const { godeNum, godeBool } = calcGodeValue()
 
     if (isSol) {
       onRecord({
@@ -118,13 +98,15 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         bid: { type: 'sol', solPlayerId, solType, won: solWon },
       })
     } else if (isTjell) {
+      // gode (klør/sans) counts as 1 doubler; halve also counts as 1 doubler
+      const godeNum = (gode ? 1 : 0) + (halve ? 1 : 0)
       onRecord({
         activePlayers,
         partnerships: [[melderId, ...(melderPartner ? [melderPartner] : [])], opponentIds],
         bid: {
           type: 'trick',
           bidderId: melderId,
-          flips: gode === 'halve' ? 0 : vipFlips,
+          flips: halve ? 0 : vipFlips,
           gode: godeNum,
           tricksBid,
           tricksWon,
@@ -139,15 +121,13 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           type: 'trick',
           bidderId: melderId,
           vipFlips,
-          gode: godeBool,
+          gode,
           tricksBid,
           tricksWon,
         },
       })
     }
   }
-
-  const halveSelected = isTjell && gode === 'halve'
 
   return (
     <div style={{ padding: '1rem', maxWidth: 440 }}>
@@ -261,7 +241,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
                 <select
@@ -276,25 +256,12 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Gode</div>
-                <select
-                  aria-label="Gode"
-                  value={gode}
-                  onChange={e => { setGode(e.target.value); if (e.target.value === 'halve') setVipFlips(0) }}
-                  style={{ width: '100%' }}
-                >
-                  {godeOptions.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>VIP</div>
                 <select
                   aria-label="VIP flips"
                   value={vipFlips}
                   onChange={e => setVipFlips(Number(e.target.value))}
-                  disabled={halveSelected}
+                  disabled={isTjell && halve}
                   style={{ width: '100%' }}
                 >
                   {VIP_OPTIONS.map(o => (
@@ -302,6 +269,29 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                   ))}
                 </select>
               </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Gode"
+                  checked={gode}
+                  onChange={e => setGode(e.target.checked)}
+                />
+                Gode (klør / uden trumf)
+              </label>
+              {isTjell && (
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label="Halve"
+                    checked={halve}
+                    disabled={vipFlips > 0}
+                    onChange={e => { setHalve(e.target.checked); if (e.target.checked) setVipFlips(0) }}
+                  />
+                  Halve
+                </label>
+              )}
             </div>
           </fieldset>
 
