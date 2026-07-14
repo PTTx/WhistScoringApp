@@ -14,6 +14,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(store.getGame() ? 'scoreboard' : 'setup')
   const [lastActive, setLastActive] = useState<string[]>(['', '', '', ''])
   const [editingRound, setEditingRound] = useState<number | null>(null)
+  const [autoExpandRound, setAutoExpandRound] = useState<number | null>(null)
 
   function refresh() {
     setGame(store.getGame())
@@ -42,9 +43,12 @@ export default function App() {
         onRecord={input => {
           if (editingRound !== null) {
             store.editRound(editingRound, input)
+            setAutoExpandRound(editingRound)
             setEditingRound(null)
           } else {
             store.recordRound(input)
+            const g = store.getGame()
+            setAutoExpandRound(g ? g.rounds.length - 1 : null)
           }
           setLastActive(input.activePlayers)
           refresh()
@@ -59,6 +63,7 @@ export default function App() {
     <Scoreboard
       game={game}
       onAddPlayer={name => { store.addPlayer(name); refresh() }}
+      autoExpandRound={autoExpandRound}
       onRenamePlayer={(id, name) => { store.renamePlayer(id, name); refresh() }}
       onNewRound={() => setScreen('round')}
       onEditRound={index => { setEditingRound(index); setScreen('round') }}

@@ -8,6 +8,7 @@ interface Props {
   onNewRound: () => void
   onEditRound: (roundIndex: number) => void
   onEnd: () => void
+  autoExpandRound?: number | null
 }
 
 function playerName(id: string, game: GameRecord) {
@@ -17,28 +18,30 @@ function playerName(id: string, game: GameRecord) {
 function roundSummary(round: RoundRecord, game: GameRecord) {
   const bid = round.bids[0]
   if (!bid) return null
+
   if (bid.type === 'sol') {
     const who = playerName(bid.bidderId, game)
     const type = bid.solType ?? ''
-    const won = bid.solWon ? 'vandt' : 'tabte'
-    const price = bid.deltas ? Math.abs(Object.values(bid.deltas).find(v => v !== 0) ?? 0) : '?'
-    return { melder: who, makker: 'Sol', label: `${type} · ${won}`, price }
+    const won = bid.solWon ?? false
+    const price = bid.deltas ? Math.abs(Object.values(bid.deltas).find(v => v !== 0) ?? 0) : 0
+    return { melder: who, makker: 'Sol', label: `${type} · ${won ? 'Vundet' : 'Tabt'}`, price, won }
   }
+
   const melder = playerName(bid.bidderId, game)
-  const makker = (() => {
-    const partnership = round.partnerships.find(p => p.includes(bid.bidderId))
-    const partnerId = partnership?.find(id => id !== bid.bidderId)
-    return partnerId ? playerName(partnerId, game) : 'Selv'
-  })()
+  const partnership = round.partnerships.find(p => p.includes(bid.bidderId))
+  const partnerId = partnership?.find(id => id !== bid.bidderId)
+  const makker = bid.partnerGaveUp || !partnerId ? 'Selv' : playerName(partnerId, game)
+
   const diff = (bid.tricksWon ?? 0) - (bid.tricksBid ?? 0)
+  const won = diff >= 0
   const result = diff === 0 ? 'præcis' : diff > 0 ? `+${diff}` : `${diff}`
-  const price = bid.bidPrice ?? (bid.deltas ? Math.max(...Object.values(bid.deltas).map(Math.abs)) : '?')
-  return { melder, makker, label: `Bud ${bid.tricksBid} · vandt ${bid.tricksWon} (${result})`, price }
+  const price = bid.bidPrice ?? (bid.deltas ? Math.max(...Object.values(bid.deltas).map(Math.abs)) : 0)
+  return { melder, makker, label: `Bud ${bid.tricksBid} · vandt ${bid.tricksWon} (${result})`, price, won }
 }
 
-export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRound, onEditRound, onEnd }: Props) {
+export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRound, onEditRound, onEnd, autoExpandRound }: Props) {
   const [newName, setNewName] = useState('')
-  const [expanded, setExpanded] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState<number | null>(autoExpandRound ?? null)
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
   const [editingPlayerName, setEditingPlayerName] = useState('')
 
@@ -124,6 +127,7 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
             const realIndex = game.rounds.length - 1 - ri
             const summary = roundSummary(round, game)
             const isOpen = expanded === realIndex
+            const rowColor = summary ? (summary.won ? 'var(--positive)' : 'var(--negative)') : 'var(--text)'
             return (
               <div
                 key={round.id}
@@ -138,7 +142,9 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
                 >
                   <span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginRight: '0.5rem' }}>#{realIndex + 1}</span>
-                    {summary ? `${summary.melder} + ${summary.makker}` : 'Runde'}
+                    <span style={{ color: rowColor }}>
+                      {summary ? `${summary.melder} + ${summary.makker}` : 'Runde'}
+                    </span>
                   </span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{isOpen ? '▲' : '▼'}</span>
                 </button>
@@ -147,8 +153,11 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: '0.5rem', fontSize: '0.9rem' }}>
                       <div><span style={{ color: 'var(--text-muted)' }}>Melder: </span>{summary.melder}</div>
                       <div><span style={{ color: 'var(--text-muted)' }}>Makker: </span>{summary.makker}</div>
-                      <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Resultat: </span>{summary.label}</div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Pris: </span>{typeof summary.price === 'number' ? `${summary.price.toFixed(2)} kr` : summary.price}</div>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Resultat: </span>
+                        <span style={{ color: rowColor, fontWeight: 600 }}>{summary.label}</span>
+                      </div>
+                      <div><span style={{ color: 'var(--text-muted)' }}>Pris: </span>{summary.price.toFixed(2)} kr</div>
                     </div>
                     <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
                       {round.bids[0]?.deltas && Object.entries(round.bids[0].deltas).map(([pid, delta]) => (

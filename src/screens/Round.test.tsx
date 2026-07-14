@@ -22,25 +22,20 @@ function makeGame(ruleset: 'tjell' | 'frants'): GameRecord {
   }
 }
 
-function selectActivePlayers() {
-  fireEvent.change(screen.getByLabelText(/active player 1/i), { target: { value: 'p1' } })
-  fireEvent.change(screen.getByLabelText(/active player 2/i), { target: { value: 'p2' } })
-  fireEvent.change(screen.getByLabelText(/active player 3/i), { target: { value: 'p3' } })
-  fireEvent.change(screen.getByLabelText(/active player 4/i), { target: { value: 'p4' } })
-}
-
 beforeEach(() => localStorage.clear())
 
 describe('Round screen - player selection', () => {
-  it('renders all players as selectable for active slots', () => {
+  it('renders all players as active checkboxes by default (expand to see)', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    expect(screen.getAllByText('Alice').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Bob').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Carol').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Dan').length).toBeGreaterThan(0)
+    // Section is collapsed by default when exactly 4 players - expand it
+    fireEvent.click(screen.getByText(/aktive spillere/i))
+    expect(screen.getByLabelText(/active player alice/i)).toBeChecked()
+    expect(screen.getByLabelText(/active player bob/i)).toBeChecked()
+    expect(screen.getByLabelText(/active player carol/i)).toBeChecked()
+    expect(screen.getByLabelText(/active player dan/i)).toBeChecked()
   })
 
-  it('submit is disabled until 4 active players and melder+partner are set', () => {
+  it('submit is disabled until melder and partner are set', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
     expect(screen.getByRole('button', { name: /registrer/i })).toBeDisabled()
   })
@@ -50,7 +45,7 @@ describe('Round screen - Tjell trick bid', () => {
   it('calls onRecord with correct Tjell trick bid input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    selectActivePlayers()
+    // All 4 players active by default
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
     fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
@@ -81,7 +76,7 @@ describe('Round screen - Sol bid', () => {
   it('calls onRecord with correct sol input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    selectActivePlayers()
+    // All 4 players active by default
     fireEvent.click(screen.getByText(/sol melding/i))
     fireEvent.change(screen.getByLabelText(/sol player/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/sol type/i), { target: { value: 'ren' } })
@@ -102,7 +97,7 @@ describe('Round screen - Frants', () => {
   it('calls onRecord with correct Frants trick bid input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
-    selectActivePlayers()
+    // All 4 players active by default
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
     fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
