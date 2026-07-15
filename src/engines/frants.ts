@@ -35,6 +35,7 @@ export interface TrickBidSettlementInput {
   bidderId: string
   partnerships: [string[], string[]]
   partnerGaveUp: boolean
+  blindMakkerId?: string
 }
 
 export function settleTrickBid({
@@ -44,6 +45,7 @@ export function settleTrickBid({
   bidderId,
   partnerships,
   partnerGaveUp,
+  blindMakkerId,
 }: TrickBidSettlementInput): Record<string, number> {
   const diff = tricksWon - tricksBid
   const multiplier = diff >= 0 ? 1 + diff : -diff
@@ -57,7 +59,14 @@ export function settleTrickBid({
   const sign = bidderWins ? 1 : -1
   const deltas: Record<string, number> = {}
 
-  if (partnerGaveUp) {
+  if (blindMakkerId) {
+    // Blind makker variant: melder wins/loses against 3 opponents (opponent + blind_makker + blind).
+    // Blind makker pays for themselves AND the blind (double). Zero-sum: melder ±3, blind_makker ±2, other ±1.
+    deltas[bidderId] = round2(sign * amount * 3)
+    for (const id of opponentPartnership) {
+      deltas[id] = id === blindMakkerId ? round2(-sign * amount * 2) : round2(-sign * amount)
+    }
+  } else if (partnerGaveUp) {
     // Melder is alone: settles individually against all three; each pays/receives amount
     deltas[bidderId] = round2(sign * amount * 3)
     for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
@@ -74,6 +83,7 @@ export interface SolSettlementInput {
   solPlayerId: string
   allPlayerIds: string[]
   won: boolean
+  blindMakkerId?: string
 }
 
 export function settleSol({
@@ -81,14 +91,22 @@ export function settleSol({
   solPlayerId,
   allPlayerIds,
   won,
+  blindMakkerId,
 }: SolSettlementInput): Record<string, number> {
   const price = SOL_PRICES[solType]
   const opponents = allPlayerIds.filter(id => id !== solPlayerId)
   const sign = won ? 1 : -1
   const deltas: Record<string, number> = {}
 
-  deltas[solPlayerId] = round2(sign * price * opponents.length)
-  for (const id of opponents) deltas[id] = round2(-sign * price)
+  if (blindMakkerId) {
+    // Each of the two real opponents pays 1.5× price (their own share + 50% of the blind's share).
+    // Sol player collects 3× price total (from 3 conceptual opponents). Zero-sum: 3 - 1.5 - 1.5 = 0.
+    deltas[solPlayerId] = round2(sign * price * 3)
+    for (const id of opponents) deltas[id] = round2(-sign * price * 1.5)
+  } else {
+    deltas[solPlayerId] = round2(sign * price * opponents.length)
+    for (const id of opponents) deltas[id] = round2(-sign * price)
+  }
 
   return deltas
 }

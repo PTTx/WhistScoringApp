@@ -48,9 +48,13 @@ describe('Round screen - Tjell trick bid', () => {
     // All 4 players active by default
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
-    fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
+    // Click chip "10" for tricks bid (already default, but click to be explicit)
+    // There are multiple "10" chips (tricksBid=10 and tricksWon=10), click first one
+    const chips10 = screen.getAllByRole('button', { name: '10' })
+    fireEvent.click(chips10[0]) // tricksBid chip
     fireEvent.click(screen.getByLabelText(/gode/i))
-    fireEvent.change(screen.getByLabelText(/tricks won/i), { target: { value: '10' } })
+    // tricksWon chips: click "10" (second occurrence since tricksBid also has 10)
+    fireEvent.click(chips10[1] ?? chips10[0]) // tricksWon chip
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
@@ -65,10 +69,18 @@ describe('Round screen - Tjell trick bid', () => {
     }))
   })
 
-  it('VIP select is disabled when Halve is selected', () => {
+  it('Halve chip disables VIP chips with value > 0 when Halve is selected', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByLabelText(/halve/i))
-    expect(screen.getByLabelText(/vip flips/i)).toBeDisabled()
+    // VIP chips 1, 2, 3 should be disabled.
+    // Chips '1', '2', '3' also appear in stik vundet (0-13), so use getAllByRole.
+    // VIP chips come first in the DOM (before stik vundet).
+    const vip1 = screen.getAllByRole('button', { name: '1' })[0]
+    const vip2 = screen.getAllByRole('button', { name: '2' })[0]
+    const vip3 = screen.getAllByRole('button', { name: '3' })[0]
+    expect(vip1).toBeDisabled()
+    expect(vip2).toBeDisabled()
+    expect(vip3).toBeDisabled()
   })
 })
 
@@ -79,7 +91,8 @@ describe('Round screen - Sol bid', () => {
     // All 4 players active by default
     fireEvent.click(screen.getByText(/sol melding/i))
     fireEvent.change(screen.getByLabelText(/sol player/i), { target: { value: 'p1' } })
-    fireEvent.change(screen.getByLabelText(/sol type/i), { target: { value: 'ren' } })
+    // Click "Ren sol" chip
+    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
     fireEvent.click(screen.getByLabelText(/vundet/i))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -101,9 +114,8 @@ describe('Round screen - Frants', () => {
     // All 4 players active by default
     fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
     fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
-    fireEvent.change(screen.getByLabelText(/tricks bid/i), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText(/vip flips/i), { target: { value: '2' } })
-    fireEvent.change(screen.getByLabelText(/tricks won/i), { target: { value: '10' } })
+    // Click VIP chip "2" - there are two "2" buttons (VIP and stik vundet), pick the first (VIP)
+    fireEvent.click(screen.getAllByRole('button', { name: '2' })[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
@@ -114,6 +126,27 @@ describe('Round screen - Frants', () => {
         vipFlips: 2,
         gode: false,
         partnerGaveUp: false,
+      }),
+    }))
+  })
+
+  it('shows Blind makker selector in Frants trick bid', () => {
+    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByText(/blind makker/i)).toBeInTheDocument()
+  })
+
+  it('calls onRecord with blindMakkerId when blind makker is selected', () => {
+    const onRecord = vi.fn()
+    render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText(/bidder/i), { target: { value: 'p1' } })
+    fireEvent.change(screen.getByLabelText(/makker/i), { target: { value: 'p2' } })
+    // Select Bob as blind makker (p2 is already makker, so pick Carol = p3)
+    fireEvent.click(screen.getByRole('button', { name: 'Carol' }))
+    fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
+    expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
+      bid: expect.objectContaining({
+        type: 'trick',
+        blindMakkerId: 'p3',
       }),
     }))
   })

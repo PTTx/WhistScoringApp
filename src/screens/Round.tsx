@@ -10,22 +10,53 @@ interface Props {
   onBack: () => void
 }
 
-const SOL_TYPES = [
-  { value: 'normal', label: 'Normal Sol' },
-  { value: 'ren', label: 'Ren Sol' },
-  { value: 'bord', label: 'På bordet' },
-  { value: 'bord-clean', label: 'På bordet uden stik' },
+const SOL_TYPES: { value: 'normal' | 'ren' | 'bord' | 'bord-clean'; label: string }[] = [
+  { value: 'normal', label: 'Sol' },
+  { value: 'ren', label: 'Ren sol' },
+  { value: 'bord-clean', label: 'Bord u/stik' },
+  { value: 'bord', label: 'Bord m/stik' },
 ]
 
-const TRICK_OPTIONS_TJELL = [7, 8, 9, 10, 11, 12, 13]
-const TRICK_OPTIONS_FRANTS = [8, 9, 10, 11, 12, 13]
-
-const VIP_OPTIONS = [
-  { value: '0', label: 'Ingen VIP' },
-  { value: '1', label: 'VIP 1 flip' },
-  { value: '2', label: 'VIP 2 flips' },
-  { value: '3', label: 'VIP 3 flips' },
+const TRICK_OPTIONS = [8, 9, 10, 11, 12, 13]
+const TRICKS_WON_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+const VIP_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: '–' },
+  { value: 1, label: '1' },
+  { value: 2, label: '2' },
+  { value: 3, label: '3' },
 ]
+
+function Chip({
+  label,
+  selected,
+  onClick,
+  disabled,
+}: {
+  label: string
+  selected: boolean
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '0.35rem 0.65rem',
+        borderRadius: 6,
+        border: '1px solid var(--border)',
+        background: selected ? 'var(--accent)' : 'var(--surface)',
+        color: selected ? '#fff' : 'var(--text)',
+        fontSize: '0.95rem',
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'default' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
 
 function s(id: string, players: GameRecord['players']) {
   return players.find(p => p.id === id)?.name ?? id
@@ -36,7 +67,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const editingBid = editingRound?.bids[0] ?? null
   const { players, ruleset } = game
   const isTjell = ruleset === 'tjell'
-  const trickOptions = isTjell ? TRICK_OPTIONS_TJELL : TRICK_OPTIONS_FRANTS
+  const isFrants = ruleset === 'frants'
 
   // Active players: default to all players, or the editing round's active players
   const initActiveSet: Set<string> = editingRound
@@ -59,11 +90,14 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     const partner = p?.find(id => id !== editingBid.bidderId)
     return partner ?? (editingBid.partnerGaveUp ? 'self' : '')
   })
-  const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? trickOptions[3])
+  const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? 10)
   const [gode, setGode] = useState(false)
   const [halve, setHalve] = useState(false)
   const [vipFlips, setVipFlips] = useState(0)
-  const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? trickOptions[3])
+  const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
+
+  // Blind makker (Frants only)
+  const [blindMakkerId, setBlindMakkerId] = useState<string>(editingBid?.blindMakkerId ?? '')
 
   // Sol
   const [solPlayerId, setSolPlayerId] = useState(editingBid?.type === 'sol' ? editingBid.bidderId : '')
@@ -111,7 +145,13 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       onRecord({
         activePlayers,
         partnerships,
-        bid: { type: 'sol', solPlayerId, solType, won: solWon },
+        bid: {
+          type: 'sol',
+          solPlayerId,
+          solType,
+          won: solWon,
+          ...(isFrants && blindMakkerId ? { blindMakkerId } : {}),
+        },
       })
     } else if (isTjell) {
       const godeNum = (gode ? 1 : 0) + (halve ? 1 : 0)
@@ -140,6 +180,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           tricksBid,
           tricksWon,
           partnerGaveUp,
+          ...(blindMakkerId ? { blindMakkerId } : {}),
         },
       })
     }
@@ -214,17 +255,37 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
             </div>
             <div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Sol type</div>
-              <select
-                aria-label="Sol type"
-                value={solType}
-                onChange={e => setSolType(e.target.value as typeof solType)}
-                style={{ width: '100%' }}
-              >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
                 {SOL_TYPES.map(st => (
-                  <option key={st.value} value={st.value}>{st.label}</option>
+                  <Chip
+                    key={st.value}
+                    label={st.label}
+                    selected={solType === st.value}
+                    onClick={() => setSolType(st.value)}
+                  />
                 ))}
-              </select>
+              </div>
             </div>
+            {isFrants && (
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Blind makker</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                  <Chip
+                    label="Ingen"
+                    selected={blindMakkerId === ''}
+                    onClick={() => setBlindMakkerId('')}
+                  />
+                  {activePlayers.filter(id => id !== solPlayerId).map(id => (
+                    <Chip
+                      key={id}
+                      label={s(id, players)}
+                      selected={blindMakkerId === id}
+                      onClick={() => setBlindMakkerId(id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
               <label>
                 <input type="radio" name="sol-result" value="won" checked={solWon}
@@ -276,35 +337,56 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
-                <select
-                  aria-label="Tricks bid"
-                  value={tricksBid}
-                  onChange={e => setTricksBid(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                >
-                  {trickOptions.map(n => (
-                    <option key={n} value={n}>{n}</option>
+            {isFrants && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Blind makker</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                  <Chip
+                    label="Ingen"
+                    selected={blindMakkerId === ''}
+                    onClick={() => setBlindMakkerId('')}
+                  />
+                  {activePlayers.filter(id => id !== melderId).map(id => (
+                    <Chip
+                      key={id}
+                      label={s(id, players)}
+                      selected={blindMakkerId === id}
+                      onClick={() => setBlindMakkerId(id)}
+                    />
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>VIP</div>
-                <select
-                  aria-label="VIP flips"
-                  value={vipFlips}
-                  onChange={e => setVipFlips(Number(e.target.value))}
-                  disabled={isTjell && halve}
-                  style={{ width: '100%' }}
-                >
-                  {VIP_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+            )}
+
+            <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                {TRICK_OPTIONS.map(n => (
+                  <Chip
+                    key={n}
+                    label={String(n)}
+                    selected={tricksBid === n}
+                    onClick={() => setTricksBid(n)}
+                  />
+                ))}
               </div>
             </div>
+
+            <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Vip</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                {VIP_OPTIONS.map(o => (
+                  <Chip
+                    key={o.value}
+                    label={o.label}
+                    selected={vipFlips === o.value}
+                    onClick={() => setVipFlips(o.value)}
+                    disabled={isTjell && halve && o.value > 0}
+                  />
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <label>
                 <input
@@ -316,7 +398,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 {' '}Gode ({isTjell ? 'klør / uden trumf' : 'klør / uden trumf / Halve'})
               </label>
               {isTjell && (
-                <label>
+                <label style={{ opacity: vipFlips > 0 ? 0.4 : 1, pointerEvents: vipFlips > 0 ? 'none' : 'auto' }}>
                   <input
                     type="checkbox"
                     aria-label="Halve"
@@ -334,16 +416,16 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
             <legend>Resultat</legend>
             <div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik vundet af melder</div>
-              <select
-                aria-label="Tricks won"
-                value={tricksWon}
-                onChange={e => setTricksWon(Number(e.target.value))}
-                style={{ width: '100%' }}
-              >
-                {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map(n => (
-                  <option key={n} value={n}>{n}</option>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                {TRICKS_WON_OPTIONS.map(n => (
+                  <Chip
+                    key={n}
+                    label={String(n)}
+                    selected={tricksWon === n}
+                    onClick={() => setTricksWon(n)}
+                  />
                 ))}
-              </select>
+              </div>
             </div>
           </fieldset>
         </>

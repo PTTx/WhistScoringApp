@@ -25,6 +25,8 @@ export interface BidRecord {
   // sol fields
   solType?: 'normal' | 'ren' | 'bord' | 'bord-clean'
   solWon?: boolean
+  // blind makker (Frants 3-player variant)
+  blindMakkerId?: string
   // per-player deltas, keyed by player id
   deltas: Record<string, number>
 }

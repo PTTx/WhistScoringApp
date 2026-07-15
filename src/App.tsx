@@ -4,6 +4,8 @@ import type { GameRecord } from './storage'
 import Setup from './screens/Setup'
 import Round from './screens/Round'
 import Scoreboard from './screens/Scoreboard'
+import RoundResult from './screens/RoundResult'
+import type { RoundResultData } from './screens/RoundResult'
 
 type Screen = 'setup' | 'round' | 'scoreboard'
 
@@ -15,6 +17,7 @@ export default function App() {
   const [lastActive, setLastActive] = useState<string[]>(['', '', '', ''])
   const [editingRound, setEditingRound] = useState<number | null>(null)
   const [autoExpandRound, setAutoExpandRound] = useState<number | null>(null)
+  const [roundResult, setRoundResult] = useState<RoundResultData | null>(null)
 
   function refresh() {
     setGame(store.getGame())
@@ -36,26 +39,45 @@ export default function App() {
 
   if (screen === 'round') {
     return (
-      <Round
-        game={game}
-        defaultActive={lastActive}
-        editingRoundIndex={editingRound}
-        onRecord={input => {
-          if (editingRound !== null) {
-            store.editRound(editingRound, input)
-            setAutoExpandRound(editingRound)
-            setEditingRound(null)
-          } else {
-            store.recordRound(input)
-            const g = store.getGame()
-            setAutoExpandRound(g ? g.rounds.length - 1 : null)
-          }
-          setLastActive(input.activePlayers)
-          refresh()
-          setScreen('scoreboard')
-        }}
-        onBack={() => { setEditingRound(null); setScreen('scoreboard') }}
-      />
+      <>
+        <Round
+          game={game}
+          defaultActive={lastActive}
+          editingRoundIndex={editingRound}
+          onRecord={input => {
+            if (editingRound !== null) {
+              store.editRound(editingRound, input)
+              setAutoExpandRound(editingRound)
+              setEditingRound(null)
+              setLastActive(input.activePlayers)
+              refresh()
+              setScreen('scoreboard')
+            } else {
+              store.recordRound(input)
+              const g = store.getGame()
+              setAutoExpandRound(g ? g.rounds.length - 1 : null)
+              setLastActive(input.activePlayers)
+              refresh()
+              // Show result popup instead of going to scoreboard
+              const updatedGame = store.getGame()
+              if (updatedGame) {
+                const lastRound = updatedGame.rounds[updatedGame.rounds.length - 1]
+                if (lastRound) {
+                  setRoundResult({ round: lastRound, game: updatedGame })
+                }
+              }
+            }
+          }}
+          onBack={() => { setEditingRound(null); setScreen('scoreboard') }}
+        />
+        {roundResult && (
+          <RoundResult
+            data={roundResult}
+            onStilling={() => { setRoundResult(null); setScreen('scoreboard') }}
+            onNyRunde={() => { setRoundResult(null) }}
+          />
+        )}
+      </>
     )
   }
 

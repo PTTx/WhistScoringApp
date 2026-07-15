@@ -95,6 +95,37 @@ describe('settleTrickBid (Frants)', () => {
     })
     expect(result).toEqual({ p1: 6.00, p2: -2.00, p3: -2.00, p4: -2.00 })
   })
+
+  it('blind makker win: melder +3×, blind_makker −2×, other opponent −1×, zero-sum', () => {
+    const result = settleTrickBid({
+      bidPrice: 2.00,
+      tricksBid: 10,
+      tricksWon: 10,
+      bidderId: 'p1',
+      partnerships: [['p1', 'p2'], ['p3', 'p4']],
+      partnerGaveUp: false,
+      blindMakkerId: 'p3',
+    })
+    expect(result).toEqual({ p1: 6.00, p3: -4.00, p4: -2.00 })
+    // zero-sum check
+    const sum = Object.values(result).reduce((a, b) => a + b, 0)
+    expect(sum).toBeCloseTo(0)
+  })
+
+  it('blind makker loss: melder −3×, blind_makker +2×, other opponent +1×, zero-sum', () => {
+    const result = settleTrickBid({
+      bidPrice: 2.00,
+      tricksBid: 10,
+      tricksWon: 9,
+      bidderId: 'p1',
+      partnerships: [['p1', 'p2'], ['p3', 'p4']],
+      partnerGaveUp: false,
+      blindMakkerId: 'p3',
+    })
+    expect(result).toEqual({ p1: -6.00, p3: 4.00, p4: 2.00 })
+    const sum = Object.values(result).reduce((a, b) => a + b, 0)
+    expect(sum).toBeCloseTo(0)
+  })
 })
 
 describe('settleSol (Frants)', () => {
@@ -146,5 +177,31 @@ describe('settleSol (Frants)', () => {
       won: true,
     })
     expect(result).toEqual({ p1: 48.00, p2: -16.00, p3: -16.00, p4: -16.00 })
+  })
+
+  it('blind makker sol win: sol player +3×price, each opponent −1.5×price, zero-sum', () => {
+    const result = settleSol({
+      solType: 'normal',
+      solPlayerId: 'p1',
+      allPlayerIds: ['p1', 'p2', 'p3'],
+      won: true,
+      blindMakkerId: 'p2',
+    })
+    expect(result).toEqual({ p1: 6.00, p2: -3.00, p3: -3.00 })
+    const sum = Object.values(result).reduce((a, b) => a + b, 0)
+    expect(sum).toBeCloseTo(0)
+  })
+
+  it('blind makker sol loss: sol player −3×price, each opponent +1.5×price, zero-sum', () => {
+    const result = settleSol({
+      solType: 'normal',
+      solPlayerId: 'p1',
+      allPlayerIds: ['p1', 'p2', 'p3'],
+      won: false,
+      blindMakkerId: 'p2',
+    })
+    expect(result).toEqual({ p1: -6.00, p2: 3.00, p3: 3.00 })
+    const sum = Object.values(result).reduce((a, b) => a + b, 0)
+    expect(sum).toBeCloseTo(0)
   })
 })

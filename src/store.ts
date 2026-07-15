@@ -24,6 +24,7 @@ export type FrantsBidInput = {
   tricksBid: number
   tricksWon: number
   partnerGaveUp: boolean
+  blindMakkerId?: string
 }
 
 export type SolBidInput = {
@@ -31,6 +32,7 @@ export type SolBidInput = {
   solPlayerId: string
   solType: 'normal' | 'ren' | 'bord' | 'bord-clean'
   won: boolean
+  blindMakkerId?: string
 }
 
 export type BidInput = TjellBidInput | FrantsBidInput | SolBidInput
@@ -101,12 +103,14 @@ export function createStore(): Store {
       let deltas: Record<string, number>
 
       if (bid.type === 'sol') {
+        const solBid = bid as SolBidInput
         const settle = current.ruleset === 'tjell' ? tjellSettleSol : frantsSettleSol
         deltas = settle({
-          solType: bid.solType,
-          solPlayerId: bid.solPlayerId,
+          solType: solBid.solType,
+          solPlayerId: solBid.solPlayerId,
           allPlayerIds: activePlayers,
-          won: bid.won,
+          won: solBid.won,
+          ...(solBid.blindMakkerId && { blindMakkerId: solBid.blindMakkerId }),
         })
       } else if (current.ruleset === 'tjell') {
         const tjellBid = bid as TjellBidInput
@@ -137,6 +141,7 @@ export function createStore(): Store {
           bidderId: frantsBid.bidderId,
           partnerships,
           partnerGaveUp: frantsBid.partnerGaveUp,
+          blindMakkerId: frantsBid.blindMakkerId,
         })
       }
 
@@ -152,8 +157,11 @@ export function createStore(): Store {
           tricksWon: (bid as TjellBidInput | FrantsBidInput).tricksWon,
         }),
         ...(bid.type === 'sol' && {
-          solType: bid.solType,
-          solWon: bid.won,
+          solType: (bid as SolBidInput).solType,
+          solWon: (bid as SolBidInput).won,
+        }),
+        ...((bid as FrantsBidInput | SolBidInput).blindMakkerId && {
+          blindMakkerId: (bid as FrantsBidInput | SolBidInput).blindMakkerId,
         }),
       }
 
