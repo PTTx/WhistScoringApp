@@ -130,18 +130,6 @@ export default function Setup({ onStart, onReopen }: Props) {
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.4rem' }}>{virtualLabel}</div>
-        <Chip
-          label={virtualLabel}
-          selected={hasVirtual}
-          onClick={() => setHasVirtual(v => !v)}
-        />
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-          {ruleset === 'tjell' ? '(tilhører altid melderen, ikke i sol)' : '(én skiftes til at spille blindt)'}
-        </span>
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Spillere (min. 4)</div>
         {names.map((name, i) => (
           <div key={i} style={{ marginBottom: '0.4rem', position: 'relative' }}>
@@ -160,6 +148,16 @@ export default function Setup({ onStart, onReopen }: Props) {
             {knownPlayers.map(n => <option key={n} value={n} />)}
           </datalist>
         )}
+        <div style={{ marginTop: '0.5rem' }}>
+          <Chip
+            label={virtualLabel}
+            selected={hasVirtual}
+            onClick={() => setHasVirtual(v => !v)}
+          />
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+            {ruleset === 'tjell' ? '(tilhører altid melderen, ikke i sol)' : '(én skiftes til at spille blindt)'}
+          </span>
+        </div>
       </div>
 
       <button onClick={handleStart} disabled={!canStart} style={{ width: '100%', padding: '0.75rem', fontSize: '1.1rem' }}>
