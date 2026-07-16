@@ -34,6 +34,7 @@ export interface TrickBidSettlementInput {
   bidderId: string
   partnerships: [string[], string[]]
   partnerGaveUp: boolean
+  katIsPartner?: boolean
 }
 
 export function settleTrickBid({
@@ -43,30 +44,35 @@ export function settleTrickBid({
   bidderId,
   partnerships,
   partnerGaveUp,
+  katIsPartner,
 }: TrickBidSettlementInput): Record<string, number> {
   const diff = tricksWon - tricksBid
   const multiplier = diff >= 0 ? 1 + diff : -diff
   const amount = round2(bidPrice * multiplier)
   const bidderWins = diff >= 0
+  const sign = bidderWins ? 1 : -1
 
   const [partnershipA, partnershipB] = partnerships
   const bidderPartnership = partnershipA.includes(bidderId) ? partnershipA : partnershipB
   const opponentPartnership = partnershipA.includes(bidderId) ? partnershipB : partnershipA
-  const partnerId = bidderPartnership.find(id => id !== bidderId)!
 
   const deltas: Record<string, number> = {}
 
-  if (!partnerGaveUp) {
-    // Standard zero-sum: bidding side wins/loses amount, opponents mirror
-    const bidderSign = bidderWins ? 1 : -1
-    for (const id of bidderPartnership) deltas[id] = round2(bidderSign * amount)
-    for (const id of opponentPartnership) deltas[id] = round2(-bidderSign * amount)
+  if (katIsPartner) {
+    // Kat is a virtual partner belonging to melder. Melder pays/receives for both seats.
+    // 2 opponent seats each pay/receive 1x; melder pays/receives 2x. Zero-sum: 2 = 2.
+    deltas[bidderId] = round2(sign * amount * 2)
+    for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
+  } else if (!partnerGaveUp) {
+    // Standard: each member of each partnership pays/receives 1x
+    for (const id of bidderPartnership) deltas[id] = round2(sign * amount)
+    for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
   } else {
-    // Partner gave up: partner joins opponents, bidder settles against all three
-    const bidderSign = bidderWins ? 1 : -1
-    deltas[bidderId] = round2(bidderSign * amount * 3)
-    deltas[partnerId] = round2(-bidderSign * amount)
-    for (const id of opponentPartnership) deltas[id] = round2(-bidderSign * amount)
+    // Selv: melder against all 3 other seats
+    const partnerId = bidderPartnership.find(id => id !== bidderId)!
+    deltas[bidderId] = round2(sign * amount * 3)
+    deltas[partnerId] = round2(-sign * amount)
+    for (const id of opponentPartnership) deltas[id] = round2(-sign * amount)
   }
 
   return deltas

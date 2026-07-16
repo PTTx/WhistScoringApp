@@ -21,28 +21,36 @@ function roundSummary(round: RoundRecord, game: GameRecord) {
 
   if (bid.type === 'sol') {
     const who = playerName(bid.bidderId, game)
-    const type = bid.solType ?? ''
+    const typeLabel: Record<string, string> = { normal: 'Sol', ren: 'Ren sol', bord: 'Bord m/stik', 'bord-clean': 'Bord u/stik' }
+    const type = typeLabel[bid.solType ?? 'normal'] ?? bid.solType ?? ''
     const won = bid.solWon ?? false
-    const price = bid.deltas ? Math.abs(Object.values(bid.deltas).find(v => v !== 0) ?? 0) : 0
-    return { melder: who, makker: 'Sol', label: `${type} · ${won ? 'Vundet' : 'Tabt'}`, price, won }
+    const extra = round.bids.length > 1 ? ` + ${playerName(round.bids[1].bidderId, game)}` : ''
+    return { melder: who + extra, makker: 'Sol', label: `${type} · ${won ? 'Vundet' : 'Tabt'}`, won }
   }
 
   const melder = playerName(bid.bidderId, game)
   const partnership = round.partnerships.find(p => p.includes(bid.bidderId))
   const partnerId = partnership?.find(id => id !== bid.bidderId)
-  const makker = bid.partnerGaveUp
-    ? 'Selv'
-    : bid.blindIsPartner
-      ? 'Blind'
-      : !partnerId
-        ? 'Selv'
-        : playerName(partnerId, game)
+  const makker = bid.katIsPartner
+    ? 'Kat'
+    : bid.partnerGaveUp
+      ? 'Selv'
+      : bid.blindIsPartner
+        ? 'Blind'
+        : !partnerId
+          ? 'Selv'
+          : playerName(partnerId, game)
+
+  const parts: string[] = [`Melding ${bid.tricksBid}`]
+  if (bid.godeKlorSans) parts.push('Klør/sans')
+  if (bid.godeHalve) parts.push('Halve')
+  const vip = bid.vipFlips ?? 0
+  if (vip > 0) parts.push(`Vip ${vip}`)
 
   const diff = (bid.tricksWon ?? 0) - (bid.tricksBid ?? 0)
   const won = diff >= 0
-  const result = diff === 0 ? 'præcis' : diff > 0 ? `+${diff}` : `${diff}`
-  const price = bid.bidPrice ?? (bid.deltas ? Math.max(...Object.values(bid.deltas).map(Math.abs)) : 0)
-  return { melder, makker, label: `Bud ${bid.tricksBid} · vandt ${bid.tricksWon} (${result})`, price, won }
+  const diffStr = diff === 0 ? '±0' : diff > 0 ? `+${diff}` : `${diff}`
+  return { melder, makker, label: `${parts.join(', ')} - vandt ${bid.tricksWon} (${diffStr})`, won }
 }
 
 export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRound, onEditRound, onEnd, autoExpandRound }: Props) {
@@ -163,7 +171,6 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
                         <span style={{ color: 'var(--text-muted)' }}>Resultat: </span>
                         <span style={{ color: rowColor, fontWeight: 600 }}>{summary.label}</span>
                       </div>
-                      <div><span style={{ color: 'var(--text-muted)' }}>Pris: </span>{summary.price.toFixed(2)} kr</div>
                     </div>
                     <div style={{ marginTop: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem' }}>
                       {round.bids[0]?.deltas && Object.entries(round.bids[0].deltas).map(([pid, delta]) => (

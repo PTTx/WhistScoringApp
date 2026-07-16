@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GameRecord } from '../storage'
-import type { RecordRoundInput } from '../store'
+import type { RecordRoundInput, TjellBidInput, FrantsBidInput, SolBidInput } from '../store'
 
 interface Props {
   game: GameRecord
@@ -19,45 +19,33 @@ const SOL_TYPES: { value: 'normal' | 'ren' | 'bord' | 'bord-clean'; label: strin
 
 const TRICK_OPTIONS = [8, 9, 10, 11, 12, 13]
 const TRICKS_WON_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-const VIP_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: '–' },
-  { value: 1, label: '1' },
-  { value: 2, label: '2' },
-  { value: 3, label: '3' },
-]
+const VIP_OPTIONS = [1, 2, 3]
 
 function Chip({
-  label,
-  selected,
-  onClick,
-  disabled,
-  color,
+  label, selected, onClick, disabled, color,
 }: {
   label: string
   selected: boolean
   onClick: () => void
   disabled?: boolean
-  color?: 'green' | 'default'
+  color?: 'green' | 'red'
 }) {
-  const isGreen = color === 'green' && selected
+  let bg = selected ? 'var(--accent)' : 'var(--surface)'
+  if (color === 'green' && selected) bg = '#2a7a2a'
+  if (color === 'red' && selected) bg = '#8b1a1a'
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: '0.35rem 0.65rem',
-        borderRadius: 6,
-        border: '1px solid var(--border)',
-        background: isGreen ? '#2a7a2a' : selected ? 'var(--accent)' : 'var(--surface)',
+        padding: '0.35rem 0.65rem', borderRadius: 6, border: '1px solid var(--border)',
+        background: bg,
         color: selected ? '#fff' : 'var(--text)',
-        fontSize: '0.95rem',
-        opacity: disabled ? 0.4 : 1,
+        fontSize: '0.95rem', opacity: disabled ? 0.4 : 1,
         cursor: disabled ? 'default' : 'pointer',
       }}
-    >
-      {label}
-    </button>
+    >{label}</button>
   )
 }
 
@@ -72,10 +60,14 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const isTjell = ruleset === 'tjell'
   const isFrants = ruleset === 'frants'
   const hasBlind = !!game.hasBlind
+  const hasKat = !!game.hasKat
 
-  const showSidderOver = players.length > 4 || (isFrants && hasBlind)
-  const minActive = Math.min(players.length, isFrants ? 3 : 4)
+  // Seats: real players needed (Kat/Blind fill the virtual 4th seat)
+  const virtualPartner = hasKat || hasBlind
+  const effectiveRealSeats = virtualPartner ? 3 : 4
+  const hasExtraPlayers = players.length > effectiveRealSeats
 
+  // --- Sitting out / active players ---
   const initSittingOut: Set<string> = (() => {
     if (editingRound) {
       const active = new Set(editingRound.activePlayers)
@@ -89,35 +81,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   })()
 
   const [sittingOut, setSittingOut] = useState<Set<string>>(initSittingOut)
-  const [sittingOutExpanded, setSittingOutExpanded] = useState(showSidderOver && initSittingOut.size > 0)
-
-  // solType: null = trick bid, otherwise the selected sol type
-  const [solType, setSolType] = useState<'normal' | 'ren' | 'bord' | 'bord-clean' | null>(
-    editingBid?.type === 'sol' ? (editingBid.solType ?? 'normal') : null
-  )
-  const isSol = solType !== null
-
-  // Melder doubles as Sol spiller
-  const [melderId, setMelderId] = useState(editingBid?.bidderId ?? '')
-  // partnerId: player id, 'blind' (Frants), or '' (no partner / selv)
-  const [partnerId, setPartnerId] = useState(() => {
-    if (!editingBid || editingBid.type === 'sol') return ''
-    if (editingBid.partnerGaveUp) return ''
-    if (editingBid.blindIsPartner) return 'blind'
-    const p = editingRound?.partnerships.find(ps => ps.includes(editingBid.bidderId ?? ''))
-    return p?.find(id => id !== editingBid.bidderId) ?? ''
-  })
-  const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? 10)
-  // Tjell: two independent gode booleans (each adds 1 doubler, both can be active together)
-  const [godeKlorSans, setGodeKlorSans] = useState(false)
-  const [godeHalve, setGodeHalve] = useState(false)
-  const [vipFlips, setVipFlips] = useState(0)
-  const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
-  const [solWon, setSolWon] = useState<boolean | null>(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : null)
-
-  const activePlayers = players.filter(p => !sittingOut.has(p.id)).map(p => p.id)
-  const activeCount = activePlayers.length
-  const activeFilled = activeCount >= minActive
 
   function toggleSittingOut(id: string) {
     setSittingOut(prev => {
@@ -132,25 +95,89 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     }
   }
 
+  const activePlayers = players.filter(p => !sittingOut.has(p.id)).map(p => p.id)
+  const activeCount = activePlayers.length
+  const activeFilled = activeCount >= effectiveRealSeats
+
+  // --- Sol type ---
+  const [solType, setSolType] = useState<'normal' | 'ren' | 'bord' | 'bord-clean' | null>(
+    editingBid?.type === 'sol' ? (editingBid.solType ?? 'normal') : null
+  )
+  const isSol = solType !== null
+
+  // --- Melder ---
+  const [melderId, setMelderId] = useState(editingBid?.bidderId ?? '')
+
+  // --- Partner (trick mode) ---
+  // partnerId: player id | 'blind' | 'kat' | '' (selv)
+  const [partnerId, setPartnerId] = useState(() => {
+    if (!editingBid || editingBid.type === 'sol') return hasKat ? 'kat' : ''
+    if (editingBid.katIsPartner) return 'kat'
+    if (editingBid.partnerGaveUp) return ''
+    if (editingBid.blindIsPartner) return 'blind'
+    const p = editingRound?.partnerships.find(ps => ps.includes(editingBid.bidderId ?? ''))
+    return p?.find(id => id !== editingBid.bidderId) ?? ''
+  })
+
+  // --- Sol second player ---
+  const [solMakkerId, setSolMakkerId] = useState('')
+  const [solMakkerWon, setSolMakkerWon] = useState<boolean | null>(null)
+
+  // --- Trick fields ---
+  const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? 10)
+  const [godeKlorSans, setGodeKlorSans] = useState(editingBid?.godeKlorSans ?? false)
+  const [godeHalve, setGodeHalve] = useState(editingBid?.godeHalve ?? false)
+  const [vipFlips, setVipFlips] = useState(editingBid?.vipFlips ?? 0)
+  const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
+
+  // --- Sol result ---
+  const [solWon, setSolWon] = useState<boolean | null>(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : null)
+
+  // --- Selectable opponents (only when hasExtraPlayers) ---
+  const initSelectedOpponents: Set<string> = (() => {
+    if (editingRound) {
+      const [partA, partB] = editingRound.partnerships
+      const bidderSide = partA.includes(editingBid?.bidderId ?? '') ? partA : partB
+      const oppSide = partA.includes(editingBid?.bidderId ?? '') ? partB : partA
+      return new Set(oppSide)
+    }
+    return new Set<string>()
+  })()
+  const [selectedOpponents, setSelectedOpponents] = useState<Set<string>>(initSelectedOpponents)
+
+  function toggleOpponent(id: string) {
+    setSelectedOpponents(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // --- Derived ---
+  const katIsPartner = partnerId === 'kat'
   const blindIsPartner = partnerId === 'blind'
-  const partnerGaveUp = partnerId === ''   // no partner selected = selv
-  const realPartnerId = (!blindIsPartner && partnerId !== '') ? partnerId : null
-  const opponentIds = activePlayers.filter(id => id !== melderId && id !== realPartnerId)
+  const partnerGaveUp = partnerId === ''
+  const realPartnerId = (!katIsPartner && !blindIsPartner && partnerId !== '') ? partnerId : null
+
+  // Opponents: when hasExtraPlayers use selectedOpponents, otherwise derive from active
+  const opponentIds: string[] = hasExtraPlayers && !isSol
+    ? [...selectedOpponents].filter(id => id !== melderId && id !== realPartnerId)
+    : activePlayers.filter(id => id !== melderId && id !== realPartnerId)
+
+  const requiredOppCount = effectiveRealSeats - 1 - (realPartnerId || katIsPartner || blindIsPartner ? 1 : 0)
 
   const showBlindChip = isFrants && (hasBlind || activeCount === 3)
-  // Makker chips: non-melder players + optional Blind; clicking selected chip deselects
-  const makkerOptions: { id: string; label: string }[] = melderId
+
+  const makkerOptions: { id: string; label: string }[] = melderId && !isSol
     ? [
-        ...activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) })),
+        ...(hasKat
+          ? []
+          : activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) }))),
         ...(showBlindChip ? [{ id: 'blind', label: 'Blind' }] : []),
       ]
     : []
 
-  const opponentNames = opponentIds.map(id => s(id, players))
-
-  // Gode/Vip logic:
-  // Tjell: klorSans and Halve are independent (each adds 1 doubler); Halve blocks VIP, klorSans does not
-  // Frants: klorSans is mutually exclusive with VIP; no Halve
   const halve = godeHalve
   const godeForTjell = (godeKlorSans ? 1 : 0) + (godeHalve ? 1 : 0)
   const godeForFrants = godeKlorSans
@@ -159,49 +186,60 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const halveDisabled = vipFlips > 0
   const vipDisabled = (isTjell && halve) || (isFrants && godeKlorSans)
 
-  // canRecord: no partner required (empty = selv); sol requires explicit result
-  const canRecord = activeFilled && melderId !== '' && (!isSol || solWon !== null)
+  // Sidder over (read-only): everyone not in active set when hasExtraPlayers
+  const sidderOverNames = hasExtraPlayers
+    ? players.filter(p => sittingOut.has(p.id)).map(p => p.name)
+    : []
+
+  // canRecord
+  const opponentsFilled = !hasExtraPlayers || opponentIds.length >= requiredOppCount
+  const solResultOk = !isSol || (solWon !== null && (!solMakkerId || solMakkerWon !== null))
+  const canRecord = activeFilled && melderId !== '' && opponentsFilled && solResultOk
 
   function handleRecord() {
     if (!canRecord) return
 
+    const bidderPartnership = [melderId, ...(realPartnerId ? [realPartnerId] : [])]
+    const partnerships: [string[], string[]] = [bidderPartnership, opponentIds]
+
     if (isSol) {
-      onRecord({
-        activePlayers,
-        partnerships: [[melderId], activePlayers.filter(id => id !== melderId)],
-        bid: { type: 'sol', solPlayerId: melderId, solType: solType!, won: solWon === true },
-      })
+      const solBids: SolBidInput[] = [
+        { type: 'sol', solPlayerId: melderId, solType: solType!, won: solWon === true },
+        ...(solMakkerId ? [{ type: 'sol' as const, solPlayerId: solMakkerId, solType: solType!, won: solMakkerWon === true }] : []),
+      ]
+      onRecord({ activePlayers, partnerships, bids: solBids })
     } else if (isTjell) {
-      onRecord({
-        activePlayers,
-        partnerships: [[melderId, ...(realPartnerId ? [realPartnerId] : [])], opponentIds],
-        bid: {
-          type: 'trick',
-          bidderId: melderId,
-          flips: halve ? 0 : vipFlips,
-          gode: godeForTjell,
-          tricksBid,
-          tricksWon,
-          partnerGaveUp,
-        },
-      })
+      const bid: TjellBidInput = {
+        type: 'trick',
+        bidderId: melderId,
+        flips: halve ? 0 : vipFlips,
+        gode: godeForTjell,
+        godeKlorSans,
+        godeHalve,
+        tricksBid,
+        tricksWon,
+        partnerGaveUp: !katIsPartner && partnerGaveUp,
+        ...(katIsPartner ? { katIsPartner: true } : {}),
+      }
+      onRecord({ activePlayers, partnerships, bids: [bid] })
     } else {
-      onRecord({
-        activePlayers,
-        partnerships: [[melderId, ...(realPartnerId ? [realPartnerId] : [])], opponentIds],
-        bid: {
-          type: 'trick',
-          bidderId: melderId,
-          vipFlips,
-          gode: godeForFrants,
-          tricksBid,
-          tricksWon,
-          partnerGaveUp,
-          ...(blindIsPartner ? { blindIsPartner: true } : {}),
-        },
-      })
+      const bid: FrantsBidInput = {
+        type: 'trick',
+        bidderId: melderId,
+        vipFlips,
+        gode: godeForFrants,
+        godeKlorSans,
+        tricksBid,
+        tricksWon,
+        partnerGaveUp,
+        ...(blindIsPartner ? { blindIsPartner: true } : {}),
+      }
+      onRecord({ activePlayers, partnerships, bids: [bid] })
     }
   }
+
+  // Players available to select as opponents (exclude melder and partner)
+  const opponentCandidates = activePlayers.filter(id => id !== melderId && id !== realPartnerId && id !== partnerId)
 
   return (
     <div style={{ padding: '1rem', maxWidth: 440 }}>
@@ -210,39 +248,15 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       </button>
       <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
 
-      {/* Sidder over — chips, only shown when relevant */}
-      {showSidderOver && (
-        <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', overflow: 'hidden' }}>
-          <button
-            onClick={() => setSittingOutExpanded(v => !v)}
-            style={{
-              width: '100%', background: 'transparent', border: 'none', color: 'var(--text)',
-              padding: '0.55rem 0.75rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              fontSize: '0.9rem',
-            }}
-          >
-            <span>
-              Sidder over
-              {sittingOut.size > 0 && (
-                <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
-                  ({[...sittingOut].map(id => s(id, players)).join(', ')})
-                </span>
-              )}
-            </span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{sittingOutExpanded ? '▲' : '▼'}</span>
-          </button>
-          {sittingOutExpanded && (
-            <div style={{ padding: '0.4rem 0.75rem 0.65rem', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {players.map(p => (
-                <Chip
-                  key={p.id}
-                  label={p.name}
-                  selected={sittingOut.has(p.id)}
-                  onClick={() => toggleSittingOut(p.id)}
-                />
-              ))}
-            </div>
-          )}
+      {/* Sidder over toggle — only when NOT hasExtraPlayers (old mode) */}
+      {!hasExtraPlayers && (players.length > effectiveRealSeats) && (
+        <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', padding: '0.55rem 0.75rem' }}>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Sidder over</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {players.map(p => (
+              <Chip key={p.id} label={p.name} selected={sittingOut.has(p.id)} onClick={() => toggleSittingOut(p.id)} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -261,40 +275,93 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 label={s(id, players)}
                 selected={melderId === id}
                 color="green"
-                onClick={() => { setMelderId(id); if (!isSol) setPartnerId('') }}
+                onClick={() => {
+                  setMelderId(id)
+                  if (!isSol) {
+                    setPartnerId(hasKat ? 'kat' : '')
+                    setSelectedOpponents(new Set())
+                  }
+                  if (isSol && solMakkerId === id) setSolMakkerId('')
+                }}
               />
             ))}
           </div>
         </div>
 
-        {/* Makker — hidden when Sol; clicking selected chip deselects */}
-        {!isSol && melderId && (
+        {/* Sol makker (sol mode only) */}
+        {isSol && melderId && (
           <div style={{ marginBottom: '0.65rem' }}>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Makker</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Sol makker (valgfri)</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {makkerOptions.map(opt => (
+              {activePlayers.filter(id => id !== melderId).map(id => (
                 <Chip
-                  key={opt.id}
-                  label={opt.label}
-                  selected={partnerId === opt.id}
-                  onClick={() => setPartnerId(partnerId === opt.id ? '' : opt.id)}
+                  key={id}
+                  label={s(id, players)}
+                  selected={solMakkerId === id}
+                  onClick={() => { setSolMakkerId(solMakkerId === id ? '' : id); setSolMakkerWon(null) }}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* Modstandere — shown whenever melder is set (not sol) */}
+        {/* Makker (trick mode) — Kat shown as fixed/disabled chip */}
         {!isSol && melderId && (
-          <div style={{ marginBottom: '0.65rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-            <span>Modstandere: </span>
-            <span style={{ color: 'var(--text)' }}>
-              {opponentNames.length > 0 ? opponentNames.join(', ') : '–'}
-            </span>
+          <div style={{ marginBottom: '0.65rem' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Makker</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {hasKat ? (
+                <Chip label="Kat" selected={true} disabled={true} onClick={() => {}} color="green" />
+              ) : (
+                makkerOptions.map(opt => (
+                  <Chip
+                    key={opt.id}
+                    label={opt.label}
+                    selected={partnerId === opt.id}
+                    onClick={() => setPartnerId(partnerId === opt.id ? '' : opt.id)}
+                  />
+                ))
+              )}
+            </div>
           </div>
         )}
 
-        {/* Stik budt — hidden when Sol */}
+        {/* Modstandere — selectable when hasExtraPlayers, read-only otherwise */}
+        {!isSol && melderId && (
+          <div style={{ marginBottom: '0.65rem' }}>
+            {hasExtraPlayers ? (
+              <>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  Modstandere (vælg {requiredOppCount})
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {opponentCandidates.map(id => (
+                    <Chip
+                      key={id}
+                      label={s(id, players)}
+                      selected={selectedOpponents.has(id)}
+                      onClick={() => toggleOpponent(id)}
+                    />
+                  ))}
+                </div>
+                {sidderOverNames.length > 0 && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                    Sidder over: {sidderOverNames.join(', ')}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                <span>Modstandere: </span>
+                <span style={{ color: 'var(--text)' }}>
+                  {opponentIds.map(id => s(id, players)).join(', ') || '–'}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stik budt */}
         {!isSol && (
           <div style={{ marginBottom: '0.5rem' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
@@ -306,7 +373,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           </div>
         )}
 
-        {/* Gode — hidden when Sol */}
+        {/* Gode */}
         {!isSol && (
           <div style={{ marginBottom: '0.5rem' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Gode</div>
@@ -329,31 +396,32 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           </div>
         )}
 
-        {/* Vip — hidden when Sol */}
+        {/* Vip — no "–", deselectable by clicking selected */}
         {!isSol && (
           <div style={{ marginBottom: '0.75rem' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Vip</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
-              {VIP_OPTIONS.map(o => (
+              {VIP_OPTIONS.map(v => (
                 <Chip
-                  key={o.value}
-                  label={o.label}
-                  selected={vipFlips === o.value}
+                  key={v}
+                  label={String(v)}
+                  selected={vipFlips === v}
                   onClick={() => {
-                    setVipFlips(o.value)
-                    if (o.value > 0) {
+                    const next = vipFlips === v ? 0 : v
+                    setVipFlips(next)
+                    if (next > 0) {
                       setGodeHalve(false)
                       if (isFrants) setGodeKlorSans(false)
                     }
                   }}
-                  disabled={vipDisabled && o.value > 0}
+                  disabled={vipDisabled && vipFlips !== v}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* Sol type chips — always visible */}
+        {/* Sol type chips */}
         <div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Sol melding</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
@@ -362,20 +430,49 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 key={st.value}
                 label={st.label}
                 selected={solType === st.value}
-                onClick={() => { const next = solType === st.value ? null : st.value; setSolType(next); if (!next) setSolWon(null) }}
+                onClick={() => {
+                  const next = solType === st.value ? null : st.value
+                  setSolType(next)
+                  if (!next) { setSolWon(null); setSolMakkerId(''); setSolMakkerWon(null) }
+                  else { setPartnerId('') }
+                }}
               />
             ))}
           </div>
         </div>
       </fieldset>
 
-      {/* Resultat — trick bid: stik vundet; sol: vundet/tabt */}
+      {/* Resultat */}
       <fieldset>
         <legend>Resultat</legend>
         {isSol ? (
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <Chip label="Vundet" selected={solWon === true} onClick={() => setSolWon(true)} color="green" />
-            <Chip label="Tabt" selected={solWon === false} onClick={() => setSolWon(false)} />
+          <div>
+            {/* Primary sol player result */}
+            {melderId && (
+              <div style={{ marginBottom: solMakkerId ? '0.65rem' : 0 }}>
+                {solMakkerId && (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                    {s(melderId, players)}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <Chip label="Vundet" selected={solWon === true} onClick={() => setSolWon(true)} color="green" />
+                  <Chip label="Tabt" selected={solWon === false} onClick={() => setSolWon(false)} color="red" />
+                </div>
+              </div>
+            )}
+            {/* Sol makker result */}
+            {solMakkerId && (
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                  {s(solMakkerId, players)}
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <Chip label="Vundet" selected={solMakkerWon === true} onClick={() => setSolMakkerWon(true)} color="green" />
+                  <Chip label="Tabt" selected={solMakkerWon === false} onClick={() => setSolMakkerWon(false)} color="red" />
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div>

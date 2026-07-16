@@ -22,11 +22,15 @@ export interface BidRecord {
   tricksWon?: number
   tricksBid?: number
   bidPrice?: number
+  godeKlorSans?: boolean
+  godeHalve?: boolean
+  vipFlips?: number
   // sol fields
   solType?: 'normal' | 'ren' | 'bord' | 'bord-clean'
   solWon?: boolean
-  // blind is on melder's side (Frants 3-player variant)
+  // virtual partner flags
   blindIsPartner?: boolean
+  katIsPartner?: boolean
   // per-player deltas, keyed by player id
   deltas: Record<string, number>
 }
@@ -38,6 +42,7 @@ export interface GameRecord {
   endedAt: number | null
   ruleset: 'tjell' | 'frants'
   hasBlind?: boolean
+  hasKat?: boolean
   players: PlayerRecord[]
   rounds: RoundRecord[]
 }
@@ -103,4 +108,16 @@ export function loadActiveGame(): GameRecord | null {
 export function clearHistory(): void {
   const active = loadActiveGame()
   saveGames(active ? [active] : [])
+}
+
+export function reopenGame(gameId: string): GameRecord | null {
+  const games = loadGames()
+  // End any currently active game
+  const updated = games.map(g => {
+    if (g.endedAt === null && g.id !== gameId) return { ...g, endedAt: Date.now() }
+    if (g.id === gameId) return { ...g, endedAt: null }
+    return g
+  })
+  saveGames(updated)
+  return updated.find(g => g.id === gameId) ?? null
 }

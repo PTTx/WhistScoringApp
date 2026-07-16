@@ -45,21 +45,20 @@ describe('recordRound - tjell trick bid', () => {
     const game = store.getGame()!
     const [alice, bob, carol, dan] = game.players.map(p => p.id)
 
-    // Alice bids 10, alm (no modifiers), wins exactly 10
-    // bid_price = 0.40 × 2^0 = 0.40
-    // Alice+Bob win 0.40 each, Carol+Dan lose 0.40 each
     store.recordRound({
       activePlayers: [alice, bob, carol, dan],
       partnerships: [[alice, bob], [carol, dan]],
-      bid: {
+      bids: [{
         type: 'trick',
         bidderId: alice,
         flips: 0,
         gode: 0,
+        godeKlorSans: false,
+        godeHalve: false,
         tricksBid: 10,
         tricksWon: 10,
         partnerGaveUp: false,
-      },
+      }],
     })
 
     const updated = store.getGame()!
@@ -79,15 +78,17 @@ describe('recordRound - tjell trick bid', () => {
     store.recordRound({
       activePlayers: [alice, bob, carol, dan],
       partnerships: [[alice, bob], [carol, dan]],
-      bid: {
+      bids: [{
         type: 'trick',
         bidderId: alice,
         flips: 0,
         gode: 0,
+        godeKlorSans: false,
+        godeHalve: false,
         tricksBid: 10,
         tricksWon: 10,
         partnerGaveUp: false,
-      },
+      }],
     })
 
     const raw = JSON.parse(localStorage.getItem('whist_games')!)
@@ -103,19 +104,19 @@ describe('recordRound - frants trick bid', () => {
     const game = store.getGame()!
     const [alice, bob, carol, dan] = game.players.map(p => p.id)
 
-    // Alice bids 10, alm, wins exactly 10 → bid_price = 2.00
     store.recordRound({
       activePlayers: [alice, bob, carol, dan],
       partnerships: [[alice, bob], [carol, dan]],
-      bid: {
+      bids: [{
         type: 'trick',
         bidderId: alice,
         vipFlips: 0,
         gode: false,
+        godeKlorSans: false,
         tricksBid: 10,
         tricksWon: 10,
         partnerGaveUp: false,
-      },
+      }],
     })
 
     const updated = store.getGame()!
@@ -136,13 +137,13 @@ describe('recordRound - sol', () => {
 
     store.recordRound({
       activePlayers: [alice, bob, carol, dan],
-      partnerships: [[alice, bob], [carol, dan]],
-      bid: {
+      partnerships: [[alice], [bob, carol, dan]],
+      bids: [{
         type: 'sol',
         solPlayerId: alice,
         solType: 'normal',
         won: true,
-      },
+      }],
     })
 
     const updated = store.getGame()!

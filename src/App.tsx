@@ -26,8 +26,13 @@ export default function App() {
   if (screen === 'setup') {
     return (
       <Setup
-        onStart={({ ruleset, playerNames, hasBlind }) => {
-          store.startGame({ ruleset, playerNames, hasBlind })
+        onStart={({ ruleset, playerNames, hasBlind, hasKat }) => {
+          store.startGame({ ruleset, playerNames, hasBlind, hasKat })
+          refresh()
+          setScreen('scoreboard')
+        }}
+        onReopen={(gameId) => {
+          store.reopenGame(gameId)
           refresh()
           setScreen('scoreboard')
         }}
