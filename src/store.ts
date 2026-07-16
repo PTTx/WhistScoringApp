@@ -24,7 +24,7 @@ export type FrantsBidInput = {
   tricksBid: number
   tricksWon: number
   partnerGaveUp: boolean
-  blindMakkerId?: string
+  blindIsPartner?: boolean
 }
 
 export type SolBidInput = {
@@ -32,7 +32,6 @@ export type SolBidInput = {
   solPlayerId: string
   solType: 'normal' | 'ren' | 'bord' | 'bord-clean'
   won: boolean
-  blindMakkerId?: string
 }
 
 export type BidInput = TjellBidInput | FrantsBidInput | SolBidInput
@@ -110,7 +109,6 @@ export function createStore(): Store {
           solPlayerId: solBid.solPlayerId,
           allPlayerIds: activePlayers,
           won: solBid.won,
-          ...(solBid.blindMakkerId && { blindMakkerId: solBid.blindMakkerId }),
         })
       } else if (current.ruleset === 'tjell') {
         const tjellBid = bid as TjellBidInput
@@ -141,7 +139,7 @@ export function createStore(): Store {
           bidderId: frantsBid.bidderId,
           partnerships,
           partnerGaveUp: frantsBid.partnerGaveUp,
-          blindMakkerId: frantsBid.blindMakkerId,
+          blindIsPartner: frantsBid.blindIsPartner,
         })
       }
 
@@ -160,8 +158,8 @@ export function createStore(): Store {
           solType: (bid as SolBidInput).solType,
           solWon: (bid as SolBidInput).won,
         }),
-        ...((bid as FrantsBidInput | SolBidInput).blindMakkerId && {
-          blindMakkerId: (bid as FrantsBidInput | SolBidInput).blindMakkerId,
+        ...((bid as FrantsBidInput).blindIsPartner && {
+          blindIsPartner: true,
         }),
       }
 

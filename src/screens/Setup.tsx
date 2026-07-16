@@ -60,7 +60,7 @@ export default function Setup({ onStart }: Props) {
   const [pastGames, setPastGames] = useState(() =>
     loadGames().filter(g => g.endedAt !== null).reverse().slice(0, 20)
   )
-  const knownPlayers = loadKnownPlayers()
+  const [knownPlayers] = useState(() => loadKnownPlayers())
 
   const filledNames = names.map(n => n.trim()).filter(Boolean)
   const canStart = filledNames.length >= 2

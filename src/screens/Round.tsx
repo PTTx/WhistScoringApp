@@ -31,12 +31,15 @@ function Chip({
   selected,
   onClick,
   disabled,
+  color,
 }: {
   label: string
   selected: boolean
   onClick: () => void
   disabled?: boolean
+  color?: 'green' | 'default'
 }) {
+  const isGreen = color === 'green' && selected
   return (
     <button
       type="button"
@@ -46,7 +49,7 @@ function Chip({
         padding: '0.35rem 0.65rem',
         borderRadius: 6,
         border: '1px solid var(--border)',
-        background: selected ? 'var(--accent)' : 'var(--surface)',
+        background: isGreen ? '#2a7a2a' : selected ? 'var(--accent)' : 'var(--surface)',
         color: selected ? '#fff' : 'var(--text)',
         fontSize: '0.95rem',
         opacity: disabled ? 0.4 : 1,
@@ -69,7 +72,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const isTjell = ruleset === 'tjell'
   const isFrants = ruleset === 'frants'
 
-  // Active players: default to all players, or the editing round's active players
   const initActiveSet: Set<string> = editingRound
     ? new Set(editingRound.activePlayers)
     : defaultActive && defaultActive.some(Boolean)
@@ -77,27 +79,25 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       : new Set(players.map(p => p.id))
 
   const [activeSet, setActiveSet] = useState<Set<string>>(initActiveSet)
-  // Only show the collapsible if there are more than 4 players
   const [activeExpanded, setActiveExpanded] = useState(players.length > 4)
 
   const [isSol, setIsSol] = useState(editingBid?.type === 'sol')
 
   // Trick bid
   const [melderId, setMelderId] = useState(editingBid?.bidderId ?? '')
+  // partnerId: player id, 'blind' (Frants), 'ingen' (no partner), or ''
   const [partnerId, setPartnerId] = useState(() => {
     if (!editingBid || editingBid.type === 'sol') return ''
+    if (editingBid.partnerGaveUp) return 'ingen'
+    if (editingBid.blindIsPartner) return 'blind'
     const p = editingRound?.partnerships.find(ps => ps.includes(editingBid.bidderId ?? ''))
-    const partner = p?.find(id => id !== editingBid.bidderId)
-    return partner ?? (editingBid.partnerGaveUp ? 'self' : '')
+    return p?.find(id => id !== editingBid.bidderId) ?? ''
   })
   const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? 10)
   const [gode, setGode] = useState(false)
   const [halve, setHalve] = useState(false)
   const [vipFlips, setVipFlips] = useState(0)
   const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
-
-  // Blind makker (Frants only)
-  const [blindMakkerId, setBlindMakkerId] = useState<string>(editingBid?.blindMakkerId ?? '')
 
   // Sol
   const [solPlayerId, setSolPlayerId] = useState(editingBid?.type === 'sol' ? editingBid.bidderId : '')
@@ -108,7 +108,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
 
   const activePlayers = players.filter(p => activeSet.has(p.id)).map(p => p.id)
   const activeCount = activePlayers.length
-  const activeFilled = activeCount >= 4
+  // Frants allows 3 active (blind makker variant), Tjell requires 4+
+  const activeFilled = isFrants ? activeCount >= 3 : activeCount >= 4
 
   function toggleActive(id: string) {
     setActiveSet(prev => {
@@ -120,19 +121,31 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       }
       return next
     })
-    // Clear melder/partner if they are no longer active
     if (activeSet.has(id)) {
       if (melderId === id) setMelderId('')
       if (partnerId === id) setPartnerId('')
     }
   }
 
-  const partnerGaveUp = partnerId === 'self'
-  const melderPartner = partnerGaveUp ? null : partnerId
-  const opponentIds = activePlayers.filter(id => id !== melderId && id !== melderPartner)
-  const partnerships: [string[], string[]] = partnerGaveUp
-    ? [[melderId], opponentIds]
-    : [[melderId, melderPartner ?? ''].filter(Boolean), opponentIds]
+  const blindIsPartner = partnerId === 'blind'
+  const partnerGaveUp = partnerId === 'ingen'
+  const realPartnerId = (!blindIsPartner && !partnerGaveUp && partnerId !== '') ? partnerId : null
+  const opponentIds = activePlayers.filter(id => id !== melderId && id !== realPartnerId)
+  const partnerships: [string[], string[]] = partnerGaveUp || blindIsPartner
+    ? [[melderId].filter(Boolean), opponentIds]
+    : [[melderId, realPartnerId ?? ''].filter(Boolean), opponentIds]
+
+  // Makker chips: non-melder active players + 'blind' (Frants 3-active) + 'ingen'
+  const makkerOptions: { id: string; label: string }[] = melderId
+    ? [
+        ...activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) })),
+        ...(isFrants && activeCount === 3 ? [{ id: 'blind', label: 'Blind' }] : []),
+        { id: 'ingen', label: 'Ingen' },
+      ]
+    : []
+
+  // Opponents shown as read-only text (excludes melder and real partner)
+  const opponentNames = opponentIds.map(id => s(id, players))
 
   const canRecord = activeFilled && (isSol
     ? solPlayerId !== ''
@@ -150,14 +163,13 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           solPlayerId,
           solType,
           won: solWon,
-          ...(isFrants && blindMakkerId ? { blindMakkerId } : {}),
         },
       })
     } else if (isTjell) {
       const godeNum = (gode ? 1 : 0) + (halve ? 1 : 0)
       onRecord({
         activePlayers,
-        partnerships: [[melderId, ...(melderPartner ? [melderPartner] : [])], opponentIds],
+        partnerships: [[melderId, ...(realPartnerId ? [realPartnerId] : [])], opponentIds],
         bid: {
           type: 'trick',
           bidderId: melderId,
@@ -171,7 +183,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     } else {
       onRecord({
         activePlayers,
-        partnerships: [[melderId, ...(melderPartner ? [melderPartner] : [])], opponentIds],
+        partnerships: [[melderId, ...(realPartnerId ? [realPartnerId] : [])], opponentIds],
         bid: {
           type: 'trick',
           bidderId: melderId,
@@ -180,7 +192,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           tricksBid,
           tricksWon,
           partnerGaveUp,
-          ...(blindMakkerId ? { blindMakkerId } : {}),
+          ...(blindIsPartner ? { blindIsPartner: true } : {}),
         },
       })
     }
@@ -193,7 +205,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       </button>
       <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
 
-      {/* Aktive spillere — collapsible, only relevant when > 4 players */}
+      {/* Aktive spillere */}
       <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', overflow: 'hidden' }}>
         <button
           onClick={() => setActiveExpanded(v => !v)}
@@ -205,7 +217,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         >
           <span>
             Aktive spillere
-            <span style={{ color: activeCount < 4 ? 'var(--negative)' : 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+            <span style={{ color: activeCount < 3 ? 'var(--negative)' : 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
               ({activeCount} valgt)
             </span>
           </span>
@@ -266,26 +278,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 ))}
               </div>
             </div>
-            {isFrants && (
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Blind makker</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
-                  <Chip
-                    label="Ingen"
-                    selected={blindMakkerId === ''}
-                    onClick={() => setBlindMakkerId('')}
-                  />
-                  {activePlayers.filter(id => id !== solPlayerId).map(id => (
-                    <Chip
-                      key={id}
-                      label={s(id, players)}
-                      selected={blindMakkerId === id}
-                      onClick={() => setBlindMakkerId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
             <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
               <label>
                 <input type="radio" name="sol-result" value="won" checked={solWon}
@@ -304,57 +296,44 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         <>
           <fieldset>
             <legend>Melding</legend>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Melder</div>
-                <select
-                  aria-label="Bidder"
-                  value={melderId}
-                  onChange={e => { setMelderId(e.target.value); setPartnerId('') }}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">--</option>
-                  {activePlayers.map(id => (
-                    <option key={id} value={id}>{s(id, players)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Makker</div>
-                <select
-                  aria-label="Makker"
-                  value={partnerId}
-                  onChange={e => setPartnerId(e.target.value)}
-                  disabled={!melderId}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">--</option>
-                  <option value="self">Selv (ingen makker)</option>
-                  {activePlayers.filter(id => id !== melderId).map(id => (
-                    <option key={id} value={id}>{s(id, players)}</option>
-                  ))}
-                </select>
+
+            <div style={{ marginBottom: '0.65rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Melder</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {activePlayers.map(id => (
+                  <Chip
+                    key={id}
+                    label={s(id, players)}
+                    selected={melderId === id}
+                    color="green"
+                    onClick={() => { setMelderId(id); setPartnerId('') }}
+                  />
+                ))}
               </div>
             </div>
 
-            {isFrants && (
-              <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Blind makker</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
-                  <Chip
-                    label="Ingen"
-                    selected={blindMakkerId === ''}
-                    onClick={() => setBlindMakkerId('')}
-                  />
-                  {activePlayers.filter(id => id !== melderId).map(id => (
+            {melderId && (
+              <div style={{ marginBottom: '0.65rem' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Makker</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {makkerOptions.map(opt => (
                     <Chip
-                      key={id}
-                      label={s(id, players)}
-                      selected={blindMakkerId === id}
-                      onClick={() => setBlindMakkerId(id)}
+                      key={opt.id}
+                      label={opt.label}
+                      selected={partnerId === opt.id}
+                      onClick={() => setPartnerId(opt.id)}
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {melderId && partnerId && (
+              <div style={{ marginBottom: '0.65rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                <span>Modstandere: </span>
+                <span style={{ color: 'var(--text)' }}>
+                  {opponentNames.length > 0 ? opponentNames.join(', ') : '–'}
+                </span>
               </div>
             )}
 
