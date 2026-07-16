@@ -56,11 +56,6 @@ export default function RoundResult({ data, onStilling, onNyRunde }: Props) {
     }
   }
 
-  const isSol = round.bids[0].type === 'sol'
-  const overallWon = isSol
-    ? (round.bids[0].solWon ?? false)
-    : ((round.bids[0].tricksWon ?? 0) >= (round.bids[0].tricksBid ?? 0))
-
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',

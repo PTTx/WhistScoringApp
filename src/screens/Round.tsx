@@ -137,7 +137,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const initSelectedOpponents: Set<string> = (() => {
     if (editingRound) {
       const [partA, partB] = editingRound.partnerships
-      const bidderSide = partA.includes(editingBid?.bidderId ?? '') ? partA : partB
       const oppSide = partA.includes(editingBid?.bidderId ?? '') ? partB : partA
       return new Set(oppSide)
     }
