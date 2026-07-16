@@ -113,7 +113,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const [godeHalve, setGodeHalve] = useState(false)
   const [vipFlips, setVipFlips] = useState(0)
   const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
-  const [solWon, setSolWon] = useState(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : false)
+  const [solWon, setSolWon] = useState<boolean | null>(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : null)
 
   const activePlayers = players.filter(p => !sittingOut.has(p.id)).map(p => p.id)
   const activeCount = activePlayers.length
@@ -159,8 +159,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const halveDisabled = vipFlips > 0
   const vipDisabled = (isTjell && halve) || (isFrants && godeKlorSans)
 
-  // canRecord: no partner required (empty = selv)
-  const canRecord = activeFilled && melderId !== ''
+  // canRecord: no partner required (empty = selv); sol requires explicit result
+  const canRecord = activeFilled && melderId !== '' && (!isSol || solWon !== null)
 
   function handleRecord() {
     if (!canRecord) return
@@ -169,7 +169,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       onRecord({
         activePlayers,
         partnerships: [[melderId], activePlayers.filter(id => id !== melderId)],
-        bid: { type: 'sol', solPlayerId: melderId, solType: solType!, won: solWon },
+        bid: { type: 'sol', solPlayerId: melderId, solType: solType!, won: solWon === true },
       })
     } else if (isTjell) {
       onRecord({
@@ -362,7 +362,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                 key={st.value}
                 label={st.label}
                 selected={solType === st.value}
-                onClick={() => setSolType(solType === st.value ? null : st.value)}
+                onClick={() => { const next = solType === st.value ? null : st.value; setSolType(next); if (!next) setSolWon(null) }}
               />
             ))}
           </div>
@@ -374,8 +374,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         <legend>Resultat</legend>
         {isSol ? (
           <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <Chip label="Vundet" selected={solWon} onClick={() => setSolWon(true)} color="green" />
-            <Chip label="Tabt" selected={!solWon} onClick={() => setSolWon(false)} />
+            <Chip label="Vundet" selected={solWon === true} onClick={() => setSolWon(true)} color="green" />
+            <Chip label="Tabt" selected={solWon === false} onClick={() => setSolWon(false)} />
           </div>
         ) : (
           <div>

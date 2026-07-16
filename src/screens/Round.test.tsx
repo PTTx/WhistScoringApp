@@ -158,6 +158,15 @@ describe('Round screen - Sol bid', () => {
     }))
   })
 
+  it('registrer is disabled until sol result is selected', () => {
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
+    expect(screen.getByRole('button', { name: /registrer/i })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /vundet/i }))
+    expect(screen.getByRole('button', { name: /registrer/i })).not.toBeDisabled()
+  })
+
   it('deselects sol when same chip clicked again', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
