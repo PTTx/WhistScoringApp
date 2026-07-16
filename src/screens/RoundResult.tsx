@@ -8,6 +8,7 @@ export interface RoundResultData {
 interface Props {
   data: RoundResultData
   onStilling: () => void
+  onRet: () => void
   onNyRunde: () => void
 }
 
@@ -44,7 +45,7 @@ function makkerLabel(bid: BidRecord, round: RoundRecord, game: GameRecord): stri
   return partnerId ? playerName(partnerId, game) : 'Selv'
 }
 
-export default function RoundResult({ data, onStilling, onNyRunde }: Props) {
+export default function RoundResult({ data, onStilling, onRet, onNyRunde }: Props) {
   const { round, game } = data
   if (!round.bids.length) return null
 
@@ -111,6 +112,9 @@ export default function RoundResult({ data, onStilling, onNyRunde }: Props) {
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button type="button" onClick={onStilling} style={{ flex: 1, padding: '0.65rem', background: 'var(--surface3)', fontSize: '1rem' }}>
             Stilling
+          </button>
+          <button type="button" onClick={onRet} style={{ flex: 1, padding: '0.65rem', background: 'var(--surface3)', fontSize: '1rem' }}>
+            Ret
           </button>
           <button type="button" onClick={onNyRunde} style={{ flex: 1, padding: '0.65rem', fontSize: '1rem' }}>
             Ny runde

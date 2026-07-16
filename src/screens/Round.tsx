@@ -11,8 +11,8 @@ interface Props {
 }
 
 const SOL_TYPES: { value: 'normal' | 'ren' | 'bord' | 'bord-clean'; label: string }[] = [
-  { value: 'normal', label: 'Sol' },
-  { value: 'ren', label: 'Ren sol' },
+  { value: 'normal', label: 'Alm' },
+  { value: 'ren', label: 'Ren' },
   { value: 'bord-clean', label: 'Bord u/stik' },
   { value: 'bord', label: 'Bord m/stik' },
 ]
@@ -64,7 +64,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
 
   const virtualPartner = hasKat || hasBlind
   // Show Sidder over when there are more real players than always fit (4+ without virtual, 3+ with virtual)
-  const showSidderOver = virtualPartner ? players.length >= 3 : players.length > 4
+  const showSidderOver = players.length > (virtualPartner ? 3 : 4)
 
   // --- Sitting out / active players ---
   const initSittingOut: Set<string> = (() => {

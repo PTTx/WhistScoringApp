@@ -24,7 +24,8 @@ function Chip({ label, selected, onClick, disabled }: { label: string; selected:
   )
 }
 
-const MAX_PLAYERS = 6
+const MAX_PLAYERS = 8
+const MIN_VISIBLE = 4
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -80,8 +81,8 @@ function GameHistoryRow({ g, onReopen }: { g: GameRecord; onReopen: (id: string)
 
 export default function Setup({ onStart, onReopen }: Props) {
   const [ruleset, setRuleset] = useState<'tjell' | 'frants'>('tjell')
-  const [hasVirtual, setHasVirtual] = useState(false) // Kat (tjell) or Blind makker (frants)
-  const [names, setNames] = useState<string[]>(Array(MAX_PLAYERS).fill(''))
+  const [hasVirtual, setHasVirtual] = useState(false)
+  const [names, setNames] = useState<string[]>(Array(MIN_VISIBLE).fill(''))
   const [pastGames, setPastGames] = useState(() =>
     loadGames().filter(g => g.endedAt !== null).reverse().slice(0, 20)
   )
@@ -91,8 +92,18 @@ export default function Setup({ onStart, onReopen }: Props) {
   const minPlayers = hasVirtual ? 3 : 4
   const canStart = filledNames.length >= minPlayers
 
+  // Grow visible fields: show one extra empty slot after the last filled one, up to MAX_PLAYERS
+  const lastFilledIndex = names.reduce((acc, n, i) => (n.trim() ? i : acc), -1)
+  const visibleCount = Math.min(MAX_PLAYERS, Math.max(MIN_VISIBLE, lastFilledIndex + 2))
+
   function handleChange(index: number, value: string) {
-    setNames(prev => prev.map((n, i) => (i === index ? value : n)))
+    setNames(prev => {
+      const next = [...prev]
+      // Grow array if needed
+      while (next.length <= index) next.push('')
+      next[index] = value
+      return next
+    })
   }
 
   function handleStart() {
@@ -116,6 +127,9 @@ export default function Setup({ onStart, onReopen }: Props) {
   }
 
   const virtualLabel = ruleset === 'tjell' ? 'Kat' : 'Blind makker'
+  const virtualDesc = ruleset === 'tjell'
+    ? '(tilhører altid melderen, ikke i sol)'
+    : '(es-makker regler)'
 
   return (
     <div style={{ padding: '1rem', maxWidth: 400 }}>
@@ -130,14 +144,22 @@ export default function Setup({ onStart, onReopen }: Props) {
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Spillere (min. 4)</div>
-        {names.map((name, i) => (
-          <div key={i} style={{ marginBottom: '0.4rem', position: 'relative' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.4rem' }}>Spillere (min. 4)</div>
+        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Chip
+            label={virtualLabel}
+            selected={hasVirtual}
+            onClick={() => setHasVirtual(v => !v)}
+          />
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{virtualDesc}</span>
+        </div>
+        {Array.from({ length: visibleCount }, (_, i) => (
+          <div key={i} style={{ marginBottom: '0.4rem' }}>
             <input
               type="text"
               list="known-players"
               placeholder={`Spiller ${i + 1}`}
-              value={name}
+              value={names[i] ?? ''}
               onChange={e => handleChange(i, e.target.value)}
               style={{ width: '100%' }}
             />
@@ -148,16 +170,6 @@ export default function Setup({ onStart, onReopen }: Props) {
             {knownPlayers.map(n => <option key={n} value={n} />)}
           </datalist>
         )}
-        <div style={{ marginTop: '0.5rem' }}>
-          <Chip
-            label={virtualLabel}
-            selected={hasVirtual}
-            onClick={() => setHasVirtual(v => !v)}
-          />
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-            {ruleset === 'tjell' ? '(tilhører altid melderen, ikke i sol)' : '(én skiftes til at spille blindt)'}
-          </span>
-        </div>
       </div>
 
       <button onClick={handleStart} disabled={!canStart} style={{ width: '100%', padding: '0.75rem', fontSize: '1.1rem' }}>

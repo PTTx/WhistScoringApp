@@ -79,6 +79,13 @@ export default function App() {
           <RoundResult
             data={roundResult}
             onStilling={() => { setRoundResult(null); setScreen('scoreboard') }}
+            onRet={() => {
+              const g = store.getGame()
+              if (g) {
+                setEditingRound(g.rounds.length - 1)
+                setRoundResult(null)
+              }
+            }}
             onNyRunde={() => { setRoundResult(null) }}
           />
         )}

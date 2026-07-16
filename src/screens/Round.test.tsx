@@ -125,14 +125,14 @@ describe('Round screen - Tjell trick bid', () => {
 describe('Round screen - Sol bid', () => {
   it('activates sol mode when a sol type chip is clicked', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     expect(screen.getByText(/sol spiller/i)).toBeInTheDocument()
     expect(screen.queryByText(/^makker$/i)).not.toBeInTheDocument()
   })
 
   it('sol result chips appear in Resultat fieldset', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Alice' })) // select sol spiller to show results
     expect(screen.getByRole('button', { name: /vundet/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /tabt/i })).toBeInTheDocument()
@@ -141,7 +141,7 @@ describe('Round screen - Sol bid', () => {
 
   it('registrer is disabled until sol result is selected', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByRole('button', { name: /registrer/i })).toBeDisabled()
     fireEvent.click(screen.getAllByRole('button', { name: /vundet/i })[0])
@@ -151,7 +151,7 @@ describe('Round screen - Sol bid', () => {
   it('calls onRecord with correct sol input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     fireEvent.click(screen.getAllByRole('button', { name: /vundet/i })[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
@@ -162,16 +162,16 @@ describe('Round screen - Sol bid', () => {
 
   it('deselects sol when same chip clicked again', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     expect(screen.getByText(/sol spiller/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     expect(screen.queryByText(/sol spiller/i)).not.toBeInTheDocument()
   })
 
   it('dual sol: two players with separate results call onRecord with two bids', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ren$/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Alice' })) // sol spiller
     // Bob appears in both Sol spiller row and Sol makker row; pick the second one (Sol makker)
     fireEvent.click(screen.getAllByRole('button', { name: 'Bob' })[1])
@@ -228,7 +228,7 @@ describe('Round screen - Frants', () => {
     ]
     const g = { ...makeGame('frants', { hasBlind: true }), players: frantsPlayers }
     render(<Round game={g} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
     // Blind chip not shown — it auto-fills
     expect(screen.queryByRole('button', { name: 'Blind' })).not.toBeInTheDocument()
   })
@@ -250,7 +250,7 @@ describe('Round screen - Frants', () => {
     ]
     const g = { ...makeGame('frants', { hasBlind: true }), players: frantsPlayers }
     render(<Round game={g} onRecord={onRecord} onBack={vi.fn()} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bids: [expect.objectContaining({ type: 'trick', bidderId: 'p1', blindIsPartner: true, partnerGaveUp: false })],
@@ -274,8 +274,8 @@ describe('Round screen - Kat (Tjell hasKat)', () => {
   it('shows Kat as fixed disabled chip in Makker row', () => {
     const g = { ...makeGame('tjell', { hasKat: true }), players: KAT_PLAYERS }
     render(<Round game={g} onRecord={vi.fn()} onBack={vi.fn()} />)
-    // Alice appears in Sidder over + Melder rows; click Melder (index 1)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    // 3 players + Kat: no Sidder over, Alice appears once
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
     expect(screen.getByRole('button', { name: 'Kat' })).toBeDisabled()
   })
 
@@ -283,7 +283,7 @@ describe('Round screen - Kat (Tjell hasKat)', () => {
     const onRecord = vi.fn()
     const g = { ...makeGame('tjell', { hasKat: true }), players: KAT_PLAYERS }
     render(<Round game={g} onRecord={onRecord} onBack={vi.fn()} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bids: [expect.objectContaining({ katIsPartner: true, partnerGaveUp: false })],
