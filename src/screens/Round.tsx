@@ -137,10 +137,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const partnerGaveUp = partnerId === 'ingen'
   const realPartnerId = (!blindIsPartner && !partnerGaveUp && partnerId !== '') ? partnerId : null
   const opponentIds = activePlayers.filter(id => id !== melderId && id !== realPartnerId)
-  const partnerships: [string[], string[]] = partnerGaveUp || blindIsPartner
-    ? [[melderId].filter(Boolean), opponentIds]
-    : [[melderId, realPartnerId ?? ''].filter(Boolean), opponentIds]
-
   const showBlindChip = isFrants && (hasBlind || activeCount === 3)
   const makkerOptions: { id: string; label: string }[] = melderId
     ? [
