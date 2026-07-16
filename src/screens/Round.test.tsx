@@ -55,15 +55,11 @@ describe('Round screen - Tjell trick bid', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
-    // Bob appears in both Melder row and Makker row - second occurrence is Makker row
     fireEvent.click(screen.getAllByRole('button', { name: 'Bob' })[1])
-    // Click Klør / sans Gode chip
     fireEvent.click(screen.getByRole('button', { name: /klør/i }))
-    // tricksBid chip "10" - first "10" button
     const chips10 = screen.getAllByRole('button', { name: '10' })
-    fireEvent.click(chips10[0])
-    // tricksWon chip "10" - second occurrence
-    fireEvent.click(chips10[1] ?? chips10[0])
+    fireEvent.click(chips10[0]) // tricksBid
+    fireEvent.click(chips10[1] ?? chips10[0]) // tricksWon
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
@@ -81,12 +77,9 @@ describe('Round screen - Tjell trick bid', () => {
   it('Halve chip disables VIP chips with value > 0', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /halve/i }))
-    const vip1 = screen.getAllByRole('button', { name: '1' })[0]
-    const vip2 = screen.getAllByRole('button', { name: '2' })[0]
-    const vip3 = screen.getAllByRole('button', { name: '3' })[0]
-    expect(vip1).toBeDisabled()
-    expect(vip2).toBeDisabled()
-    expect(vip3).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '1' })[0]).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '2' })[0]).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '3' })[0]).toBeDisabled()
   })
 
   it('Halve chip is not shown in Frants', () => {
@@ -96,28 +89,57 @@ describe('Round screen - Tjell trick bid', () => {
 })
 
 describe('Round screen - Sol bid', () => {
+  it('activates sol mode when a sol type chip is clicked', () => {
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    expect(screen.getByText(/sol spiller/i)).toBeInTheDocument()
+    expect(screen.queryByText(/^makker$/i)).not.toBeInTheDocument()
+  })
+
   it('calls onRecord with correct sol input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByText(/sol melding/i))
-    fireEvent.change(screen.getByLabelText(/sol player/i), { target: { value: 'p1' } })
+    // Select sol type first (activates sol mode)
     fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    // Select sol player (Alice = first chip)
+    fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     fireEvent.click(screen.getByLabelText(/vundet/i))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: { type: 'sol', solPlayerId: 'p1', solType: 'ren', won: true },
     }))
   })
+
+  it('deselects sol when same chip clicked again', () => {
+    render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    expect(screen.getByText(/sol spiller/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /ren sol/i }))
+    expect(screen.queryByText(/sol spiller/i)).not.toBeInTheDocument()
+  })
 })
 
 describe('Round screen - Frants', () => {
+  it('Gode disables Vip > 0 in Frants', () => {
+    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /klør/i }))
+    expect(screen.getAllByRole('button', { name: '1' })[0]).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '2' })[0]).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: '3' })[0]).toBeDisabled()
+  })
+
+  it('Vip > 0 disables Gode in Frants', () => {
+    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getAllByRole('button', { name: '1' })[0])
+    expect(screen.getByRole('button', { name: /klør/i })).toBeDisabled()
+  })
+
   it('calls onRecord with correct Frants trick bid input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Bob' })[1])
-    // VIP chip "2"
-    fireEvent.click(screen.getAllByRole('button', { name: '2' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: '2' })[0]) // VIP 2
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bid: expect.objectContaining({
@@ -157,12 +179,7 @@ describe('Round screen - Frants', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Blind' }))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
-      bid: expect.objectContaining({
-        type: 'trick',
-        bidderId: 'p1',
-        blindIsPartner: true,
-        partnerGaveUp: false,
-      }),
+      bid: expect.objectContaining({ type: 'trick', bidderId: 'p1', blindIsPartner: true, partnerGaveUp: false }),
     }))
   })
 
@@ -173,11 +190,7 @@ describe('Round screen - Frants', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ingen' }))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
-      bid: expect.objectContaining({
-        type: 'trick',
-        bidderId: 'p1',
-        partnerGaveUp: true,
-      }),
+      bid: expect.objectContaining({ type: 'trick', bidderId: 'p1', partnerGaveUp: true }),
     }))
   })
 
