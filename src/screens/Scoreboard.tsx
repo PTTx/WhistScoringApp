@@ -30,7 +30,13 @@ function roundSummary(round: RoundRecord, game: GameRecord) {
   const melder = playerName(bid.bidderId, game)
   const partnership = round.partnerships.find(p => p.includes(bid.bidderId))
   const partnerId = partnership?.find(id => id !== bid.bidderId)
-  const makker = bid.partnerGaveUp || !partnerId ? 'Selv' : playerName(partnerId, game)
+  const makker = bid.partnerGaveUp
+    ? 'Selv'
+    : bid.blindIsPartner
+      ? 'Blind'
+      : !partnerId
+        ? 'Selv'
+        : playerName(partnerId, game)
 
   const diff = (bid.tricksWon ?? 0) - (bid.tricksBid ?? 0)
   const won = diff >= 0

@@ -37,6 +37,7 @@ export interface GameRecord {
   startedAt: number
   endedAt: number | null
   ruleset: 'tjell' | 'frants'
+  hasBlind?: boolean
   players: PlayerRecord[]
   rounds: RoundRecord[]
 }

@@ -47,6 +47,8 @@ export default function RoundResult({ data, onStilling, onNyRunde }: Props) {
     makkerName = 'Sol'
   } else if (bid.partnerGaveUp) {
     makkerName = 'Selv'
+  } else if (bid.blindIsPartner) {
+    makkerName = 'Blind'
   } else {
     const partnership = round.partnerships.find(p => p.includes(bid.bidderId))
     const partnerId = partnership?.find(id => id !== bid.bidderId)

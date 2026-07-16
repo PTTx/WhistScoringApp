@@ -3,7 +3,7 @@ import { loadKnownPlayers, loadGames, clearHistory } from '../storage'
 import type { GameRecord } from '../storage'
 
 interface Props {
-  onStart: (opts: { ruleset: 'tjell' | 'frants'; playerNames: string[] }) => void
+  onStart: (opts: { ruleset: 'tjell' | 'frants'; playerNames: string[]; hasBlind?: boolean }) => void
 }
 
 const MAX_PLAYERS = 6
@@ -56,6 +56,7 @@ function GameHistoryRow({ g }: { g: GameRecord }) {
 
 export default function Setup({ onStart }: Props) {
   const [ruleset, setRuleset] = useState<'tjell' | 'frants'>('tjell')
+  const [hasBlind, setHasBlind] = useState(false)
   const [names, setNames] = useState<string[]>(Array(MAX_PLAYERS).fill(''))
   const [pastGames, setPastGames] = useState(() =>
     loadGames().filter(g => g.endedAt !== null).reverse().slice(0, 20)
@@ -70,7 +71,7 @@ export default function Setup({ onStart }: Props) {
   }
 
   function handleStart() {
-    onStart({ ruleset, playerNames: filledNames })
+    onStart({ ruleset, playerNames: filledNames, ...(hasBlind ? { hasBlind: true } : {}) })
   }
 
   function handleClearHistory() {
@@ -89,13 +90,27 @@ export default function Setup({ onStart }: Props) {
         <select
           id="ruleset"
           value={ruleset}
-          onChange={e => setRuleset(e.target.value as 'tjell' | 'frants')}
+          onChange={e => { setRuleset(e.target.value as 'tjell' | 'frants'); setHasBlind(false) }}
           style={{ width: '100%' }}
         >
           <option value="tjell">Familien Tjell</option>
           <option value="frants">Frants</option>
         </select>
       </div>
+
+      {ruleset === 'frants' && (
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={hasBlind}
+              onChange={e => setHasBlind(e.target.checked)}
+            />
+            <span>Blind makker</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>(én spiller skiftes til at spille blindt)</span>
+          </label>
+        </div>
+      )}
 
       <div style={{ marginBottom: '1rem' }}>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Spillere (min. 2)</div>

@@ -10,7 +10,7 @@ const PLAYERS = [
   { id: 'p4', name: 'Dan', balance: 0 },
 ]
 
-function makeGame(ruleset: 'tjell' | 'frants'): GameRecord {
+function makeGame(ruleset: 'tjell' | 'frants', extra?: Partial<GameRecord>): GameRecord {
   return {
     schemaVersion: 1,
     id: 'g1',
@@ -19,19 +19,29 @@ function makeGame(ruleset: 'tjell' | 'frants'): GameRecord {
     ruleset,
     players: PLAYERS,
     rounds: [],
+    ...extra,
   }
 }
 
 beforeEach(() => localStorage.clear())
 
 describe('Round screen - player selection', () => {
-  it('renders all players as active checkboxes by default (expand to see)', () => {
+  it('does not show Sidder over when exactly 4 players and no blind', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByText(/aktive spillere/i))
-    expect(screen.getByLabelText(/active player alice/i)).toBeChecked()
-    expect(screen.getByLabelText(/active player bob/i)).toBeChecked()
-    expect(screen.getByLabelText(/active player carol/i)).toBeChecked()
-    expect(screen.getByLabelText(/active player dan/i)).toBeChecked()
+    expect(screen.queryByText(/sidder over/i)).not.toBeInTheDocument()
+  })
+
+  it('shows Sidder over when >4 players', () => {
+    const game = makeGame('tjell', {
+      players: [...PLAYERS, { id: 'p5', name: 'Eve', balance: 0 }],
+    })
+    render(<Round game={game} onRecord={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByText(/sidder over/i)).toBeInTheDocument()
+  })
+
+  it('shows Sidder over in Frants with hasBlind', () => {
+    render(<Round game={makeGame('frants', { hasBlind: true })} onRecord={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByText(/sidder over/i)).toBeInTheDocument()
   })
 
   it('submit is disabled until melder and makker are set', () => {
@@ -44,14 +54,14 @@ describe('Round screen - Tjell trick bid', () => {
   it('calls onRecord with correct Tjell trick bid input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('tjell')} onRecord={onRecord} onBack={vi.fn()} />)
-    // Select Melder = Alice (first chip row), then Makker = Bob (second occurrence after Alice selected)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
-    // Bob now appears in both melder row and makker row - click the second one (makker row)
+    // Bob appears in both Melder row and Makker row - second occurrence is Makker row
     fireEvent.click(screen.getAllByRole('button', { name: 'Bob' })[1])
-    // tricksBid chip "10" - click the first "10" button (tricksBid row)
+    // Click Klør / sans Gode chip
+    fireEvent.click(screen.getByRole('button', { name: /klør/i }))
+    // tricksBid chip "10" - first "10" button
     const chips10 = screen.getAllByRole('button', { name: '10' })
     fireEvent.click(chips10[0])
-    fireEvent.click(screen.getByLabelText(/gode/i))
     // tricksWon chip "10" - second occurrence
     fireEvent.click(chips10[1] ?? chips10[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
@@ -68,15 +78,20 @@ describe('Round screen - Tjell trick bid', () => {
     }))
   })
 
-  it('Halve chip disables VIP chips with value > 0 when Halve is selected', () => {
+  it('Halve chip disables VIP chips with value > 0', () => {
     render(<Round game={makeGame('tjell')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getByLabelText(/halve/i))
+    fireEvent.click(screen.getByRole('button', { name: /halve/i }))
     const vip1 = screen.getAllByRole('button', { name: '1' })[0]
     const vip2 = screen.getAllByRole('button', { name: '2' })[0]
     const vip3 = screen.getAllByRole('button', { name: '3' })[0]
     expect(vip1).toBeDisabled()
     expect(vip2).toBeDisabled()
     expect(vip3).toBeDisabled()
+  })
+
+  it('Halve chip is not shown in Frants', () => {
+    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^halve$/i })).not.toBeInTheDocument()
   })
 })
 
@@ -96,18 +111,12 @@ describe('Round screen - Sol bid', () => {
 })
 
 describe('Round screen - Frants', () => {
-  it('does not show separate Halve checkbox for Frants (Halve is part of Gode)', () => {
-    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    expect(screen.queryByLabelText(/^halve$/i)).not.toBeInTheDocument()
-  })
-
   it('calls onRecord with correct Frants trick bid input', () => {
     const onRecord = vi.fn()
     render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
-    // Bob appears in both Melder and Makker rows; second occurrence is Makker row
     fireEvent.click(screen.getAllByRole('button', { name: 'Bob' })[1])
-    // VIP chip "2" - first "2" button (VIP row, before stik vundet)
+    // VIP chip "2"
     fireEvent.click(screen.getAllByRole('button', { name: '2' })[0])
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -123,35 +132,27 @@ describe('Round screen - Frants', () => {
     }))
   })
 
-  it('shows Ingen chip in Makker row for Frants with 4 active players', () => {
+  it('shows Ingen chip in Makker row', () => {
     render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    // Select a melder first to reveal makker options
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByRole('button', { name: 'Ingen' })).toBeInTheDocument()
   })
 
-  it('does not show Blind chip when 4 active players', () => {
+  it('does not show Blind chip when 4 active players and no hasBlind', () => {
     render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.queryByRole('button', { name: 'Blind' })).not.toBeInTheDocument()
   })
 
-  it('shows Blind chip when only 3 active players (Frants)', () => {
-    render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
-    // Deactivate Dan to have 3 active players
-    fireEvent.click(screen.getByText(/aktive spillere/i))
-    fireEvent.click(screen.getByLabelText(/active player dan/i))
-    // Now select melder
+  it('shows Blind chip when hasBlind is set', () => {
+    render(<Round game={makeGame('frants', { hasBlind: true })} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByRole('button', { name: 'Blind' })).toBeInTheDocument()
   })
 
   it('calls onRecord with blindIsPartner when Blind chip selected', () => {
     const onRecord = vi.fn()
-    render(<Round game={makeGame('frants')} onRecord={onRecord} onBack={vi.fn()} />)
-    // Deactivate Dan to get 3 active
-    fireEvent.click(screen.getByText(/aktive spillere/i))
-    fireEvent.click(screen.getByLabelText(/active player dan/i))
+    render(<Round game={makeGame('frants', { hasBlind: true })} onRecord={onRecord} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     fireEvent.click(screen.getByRole('button', { name: 'Blind' }))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
@@ -183,7 +184,6 @@ describe('Round screen - Frants', () => {
   it('shows Modstandere after melder and makker are selected', () => {
     render(<Round game={makeGame('frants')} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
-    // Use Ingen (unique chip in makker row) to avoid ambiguity with player name chips
     fireEvent.click(screen.getByRole('button', { name: 'Ingen' }))
     expect(screen.getByText(/modstandere/i)).toBeInTheDocument()
   })

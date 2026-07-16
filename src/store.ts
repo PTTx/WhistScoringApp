@@ -43,7 +43,7 @@ export interface RecordRoundInput {
 }
 
 export interface Store {
-  startGame(opts: { ruleset: 'tjell' | 'frants'; playerNames: string[] }): void
+  startGame(opts: { ruleset: 'tjell' | 'frants'; playerNames: string[]; hasBlind?: boolean }): void
   getGame(): GameRecord | null
   addPlayer(name: string): void
   renamePlayer(playerId: string, newName: string): void
@@ -60,7 +60,7 @@ export function createStore(): Store {
   }
 
   return {
-    startGame({ ruleset, playerNames }) {
+    startGame({ ruleset, playerNames, hasBlind }) {
       addKnownPlayers(playerNames)
       current = {
         schemaVersion: SCHEMA_VERSION,
@@ -68,6 +68,7 @@ export function createStore(): Store {
         startedAt: Date.now(),
         endedAt: null,
         ruleset,
+        ...(hasBlind ? { hasBlind: true } : {}),
         players: playerNames.map(name => ({ id: generateId(), name, balance: 0 })),
         rounds: [],
       }

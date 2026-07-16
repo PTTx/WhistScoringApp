@@ -71,15 +71,30 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const { players, ruleset } = game
   const isTjell = ruleset === 'tjell'
   const isFrants = ruleset === 'frants'
+  const hasBlind = !!game.hasBlind
 
-  const initActiveSet: Set<string> = editingRound
-    ? new Set(editingRound.activePlayers)
-    : defaultActive && defaultActive.some(Boolean)
-      ? new Set(defaultActive.filter(Boolean))
-      : new Set(players.map(p => p.id))
+  // "Sidder over" is shown when players > 4, or in Frants with blind makker enabled
+  const showSidderOver = players.length > 4 || (isFrants && hasBlind)
 
-  const [activeSet, setActiveSet] = useState<Set<string>>(initActiveSet)
-  const [activeExpanded, setActiveExpanded] = useState(players.length > 4)
+  // minActive: Frants with blind = 3, otherwise 4 (or total players if fewer)
+  const minActive = Math.min(players.length, isFrants ? 3 : 4)
+
+  // Init: who is sitting out (inverse of active set)
+  const initSittingOut: Set<string> = (() => {
+    if (editingRound) {
+      const active = new Set(editingRound.activePlayers)
+      return new Set(players.map(p => p.id).filter(id => !active.has(id)))
+    }
+    if (defaultActive && defaultActive.some(id => players.some(p => p.id === id))) {
+      const activeIds = new Set(defaultActive.filter(id => players.some(p => p.id === id)))
+      return new Set(players.map(p => p.id).filter(id => !activeIds.has(id)))
+    }
+    // Default: no one sits out (all active)
+    return new Set<string>()
+  })()
+
+  const [sittingOut, setSittingOut] = useState<Set<string>>(initSittingOut)
+  const [sittingOutExpanded, setSittingOutExpanded] = useState(showSidderOver && initSittingOut.size > 0)
 
   const [isSol, setIsSol] = useState(editingBid?.type === 'sol')
 
@@ -94,8 +109,12 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     return p?.find(id => id !== editingBid.bidderId) ?? ''
   })
   const [tricksBid, setTricksBid] = useState(editingBid?.tricksBid ?? 10)
-  const [gode, setGode] = useState(false)
-  const [halve, setHalve] = useState(false)
+  // godeType: '' | 'klor-sans' | 'halve' (Tjell), '' | 'klor-sans' (Frants, Halve is part of Gode)
+  const [godeType, setGodeType] = useState<'' | 'klor-sans' | 'halve'>(() => {
+    if (!editingBid || editingBid.type === 'sol') return ''
+    // Reconstruct from stored bid - not persisted granularly, default to ''
+    return ''
+  })
   const [vipFlips, setVipFlips] = useState(0)
   const [tricksWon, setTricksWon] = useState(editingBid?.tricksWon ?? 10)
 
@@ -106,13 +125,12 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   )
   const [solWon, setSolWon] = useState(editingBid?.type === 'sol' ? (editingBid.solWon ?? false) : false)
 
-  const activePlayers = players.filter(p => activeSet.has(p.id)).map(p => p.id)
+  const activePlayers = players.filter(p => !sittingOut.has(p.id)).map(p => p.id)
   const activeCount = activePlayers.length
-  // Frants allows 3 active (blind makker variant), Tjell requires 4+
-  const activeFilled = isFrants ? activeCount >= 3 : activeCount >= 4
+  const activeFilled = activeCount >= minActive
 
-  function toggleActive(id: string) {
-    setActiveSet(prev => {
+  function toggleSittingOut(id: string) {
+    setSittingOut(prev => {
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
@@ -121,7 +139,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       }
       return next
     })
-    if (activeSet.has(id)) {
+    // Clear melder/partner if they sit out
+    if (!sittingOut.has(id)) {
       if (melderId === id) setMelderId('')
       if (partnerId === id) setPartnerId('')
     }
@@ -135,17 +154,24 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
     ? [[melderId].filter(Boolean), opponentIds]
     : [[melderId, realPartnerId ?? ''].filter(Boolean), opponentIds]
 
-  // Makker chips: non-melder active players + 'blind' (Frants 3-active) + 'ingen'
+  // Blind chip shows when Frants + (hasBlind game option OR exactly 3 active)
+  const showBlindChip = isFrants && (hasBlind || activeCount === 3)
+
+  // Makker chips: non-melder active players + optional 'blind' + 'ingen'
   const makkerOptions: { id: string; label: string }[] = melderId
     ? [
         ...activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) })),
-        ...(isFrants && activeCount === 3 ? [{ id: 'blind', label: 'Blind' }] : []),
+        ...(showBlindChip ? [{ id: 'blind', label: 'Blind' }] : []),
         { id: 'ingen', label: 'Ingen' },
       ]
     : []
 
-  // Opponents shown as read-only text (excludes melder and real partner)
   const opponentNames = opponentIds.map(id => s(id, players))
+
+  // Derive gode/halve numbers for engines
+  const halve = godeType === 'halve'
+  const godeForTjell = godeType !== '' ? 1 : 0   // clubs/sans/halve each = 1 doubler
+  const godeForFrants = godeType !== ''            // any selection = gode
 
   const canRecord = activeFilled && (isSol
     ? solPlayerId !== ''
@@ -166,7 +192,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         },
       })
     } else if (isTjell) {
-      const godeNum = (gode ? 1 : 0) + (halve ? 1 : 0)
       onRecord({
         activePlayers,
         partnerships: [[melderId, ...(realPartnerId ? [realPartnerId] : [])], opponentIds],
@@ -174,7 +199,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           type: 'trick',
           bidderId: melderId,
           flips: halve ? 0 : vipFlips,
-          gode: godeNum,
+          gode: godeForTjell,
           tricksBid,
           tricksWon,
           partnerGaveUp,
@@ -188,7 +213,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           type: 'trick',
           bidderId: melderId,
           vipFlips,
-          gode,
+          gode: godeForFrants,
           tricksBid,
           tricksWon,
           partnerGaveUp,
@@ -205,40 +230,44 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
       </button>
       <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
 
-      {/* Aktive spillere */}
-      <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', overflow: 'hidden' }}>
-        <button
-          onClick={() => setActiveExpanded(v => !v)}
-          style={{
-            width: '100%', background: 'transparent', border: 'none', color: 'var(--text)',
-            padding: '0.55rem 0.75rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            fontSize: '0.9rem',
-          }}
-        >
-          <span>
-            Aktive spillere
-            <span style={{ color: activeCount < 3 ? 'var(--negative)' : 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
-              ({activeCount} valgt)
+      {/* Sidder over — only shown when relevant */}
+      {showSidderOver && (
+        <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', overflow: 'hidden' }}>
+          <button
+            onClick={() => setSittingOutExpanded(v => !v)}
+            style={{
+              width: '100%', background: 'transparent', border: 'none', color: 'var(--text)',
+              padding: '0.55rem 0.75rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: '0.9rem',
+            }}
+          >
+            <span>
+              Sidder over
+              {sittingOut.size > 0 && (
+                <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+                  ({[...sittingOut].map(id => s(id, players)).join(', ')})
+                </span>
+              )}
             </span>
-          </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{activeExpanded ? '▲' : '▼'}</span>
-        </button>
-        {activeExpanded && (
-          <div style={{ padding: '0.4rem 0.75rem 0.65rem', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            {players.map(p => (
-              <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  aria-label={`Active player ${p.name}`}
-                  checked={activeSet.has(p.id)}
-                  onChange={() => toggleActive(p.id)}
-                />
-                {p.name}
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{sittingOutExpanded ? '▲' : '▼'}</span>
+          </button>
+          {sittingOutExpanded && (
+            <div style={{ padding: '0.4rem 0.75rem 0.65rem', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {players.map(p => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Sitting out ${p.name}`}
+                    checked={sittingOut.has(p.id)}
+                    onChange={() => toggleSittingOut(p.id)}
+                  />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: '1rem' }}>
         <label>
@@ -280,13 +309,11 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
             </div>
             <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.25rem' }}>
               <label>
-                <input type="radio" name="sol-result" value="won" checked={solWon}
-                  onChange={() => setSolWon(true)} />
+                <input type="radio" name="sol-result" value="won" checked={solWon} onChange={() => setSolWon(true)} />
                 {' '}Vundet
               </label>
               <label>
-                <input type="radio" name="sol-result" value="lost" checked={!solWon}
-                  onChange={() => setSolWon(false)} />
+                <input type="radio" name="sol-result" value="lost" checked={!solWon} onChange={() => setSolWon(false)} />
                 {' '}Tabt
               </label>
             </div>
@@ -341,13 +368,28 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik budt</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
                 {TRICK_OPTIONS.map(n => (
-                  <Chip
-                    key={n}
-                    label={String(n)}
-                    selected={tricksBid === n}
-                    onClick={() => setTricksBid(n)}
-                  />
+                  <Chip key={n} label={String(n)} selected={tricksBid === n} onClick={() => setTricksBid(n)} />
                 ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Gode</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                <Chip
+                  label="Klør / sans"
+                  selected={godeType === 'klor-sans'}
+                  onClick={() => setGodeType(godeType === 'klor-sans' ? '' : 'klor-sans')}
+                  disabled={isTjell && vipFlips > 0}
+                />
+                {isTjell && (
+                  <Chip
+                    label="Halve"
+                    selected={godeType === 'halve'}
+                    onClick={() => { setGodeType(godeType === 'halve' ? '' : 'halve'); setVipFlips(0) }}
+                    disabled={vipFlips > 0}
+                  />
+                )}
               </div>
             </div>
 
@@ -359,35 +401,11 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                     key={o.value}
                     label={o.label}
                     selected={vipFlips === o.value}
-                    onClick={() => setVipFlips(o.value)}
+                    onClick={() => { setVipFlips(o.value); if (o.value > 0) setGodeType(g => g === 'halve' ? '' : g) }}
                     disabled={isTjell && halve && o.value > 0}
                   />
                 ))}
               </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <label>
-                <input
-                  type="checkbox"
-                  aria-label="Gode"
-                  checked={gode}
-                  onChange={e => setGode(e.target.checked)}
-                />
-                {' '}Gode ({isTjell ? 'klør / uden trumf' : 'klør / uden trumf / Halve'})
-              </label>
-              {isTjell && (
-                <label style={{ opacity: vipFlips > 0 ? 0.4 : 1, pointerEvents: vipFlips > 0 ? 'none' : 'auto' }}>
-                  <input
-                    type="checkbox"
-                    aria-label="Halve"
-                    checked={halve}
-                    disabled={vipFlips > 0}
-                    onChange={e => { setHalve(e.target.checked); if (e.target.checked) setVipFlips(0) }}
-                  />
-                  {' '}Halve
-                </label>
-              )}
             </div>
           </fieldset>
 
@@ -397,12 +415,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 2 }}>Stik vundet af melder</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
                 {TRICKS_WON_OPTIONS.map(n => (
-                  <Chip
-                    key={n}
-                    label={String(n)}
-                    selected={tricksWon === n}
-                    onClick={() => setTricksWon(n)}
-                  />
+                  <Chip key={n} label={String(n)} selected={tricksWon === n} onClick={() => setTricksWon(n)} />
                 ))}
               </div>
             </div>
