@@ -161,8 +161,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
 
   // --- Derived ---
   const katIsPartner = katInPlay
-  // blindIsPartner: either auto (3 real players active with hasBlind) or explicit Blind chip selection
-  const blindIsPartner = blindInPlay || partnerId === 'blind'
+  // blindIsPartner: explicit Blind chip selection only
+  const blindIsPartner = partnerId === 'blind'
   const partnerGaveUp = !katIsPartner && !blindIsPartner && partnerId === ''
   const realPartnerId = (!katIsPartner && !blindIsPartner && partnerId !== '') ? partnerId : null
 
@@ -175,8 +175,8 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const hasPartnerSeat = realPartnerId != null || katIsPartner || blindIsPartner
   const requiredOppCount = effectiveSeats - 1 - (hasPartnerSeat ? 1 : 0)
 
-  // Blind chip: show for explicit selection only when hasBlind and 4 active (otherwise blindInPlay auto-fills)
-  const showBlindChip = isFrants && hasBlind && !blindInPlay
+  // Blind chip: always show as a selectable makker option when Frants + hasBlind
+  const showBlindChip = isFrants && hasBlind
   // Kat chip: show when Kat is in play (3 active real players with hasKat)
   const showKatChip = katInPlay
 

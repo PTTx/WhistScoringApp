@@ -219,8 +219,7 @@ describe('Round screen - Frants', () => {
     expect(screen.queryByRole('button', { name: 'Blind' })).not.toBeInTheDocument()
   })
 
-  it('with 3 players + hasBlind: blind auto-fills (no chip shown, blindIsPartner auto)', () => {
-    // 3 real players + hasBlind means blind fills the 4th seat automatically
+  it('shows Blind chip when hasBlind and 3 active players', () => {
     const frantsPlayers = [
       { id: 'p1', name: 'Alice', balance: 0 },
       { id: 'p2', name: 'Bob', balance: 0 },
@@ -229,19 +228,16 @@ describe('Round screen - Frants', () => {
     const g = { ...makeGame('frants', { hasBlind: true }), players: frantsPlayers }
     render(<Round game={g} onRecord={vi.fn()} onBack={vi.fn()} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
-    // Blind chip not shown — it auto-fills
-    expect(screen.queryByRole('button', { name: 'Blind' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Blind' })).toBeInTheDocument()
   })
 
-  it('shows Blind chip when hasBlind and 4 active players (explicit selection)', () => {
-    // 4 real players + hasBlind: Blind chip available for explicit selection as partner
+  it('shows Blind chip when hasBlind and 4 active players', () => {
     render(<Round game={makeGame('frants', { hasBlind: true })} onRecord={vi.fn()} onBack={vi.fn()} />)
-    // Alice appears in Sidder over + Melder rows; click Melder (index 1)
     fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
     expect(screen.getByRole('button', { name: 'Blind' })).toBeInTheDocument()
   })
 
-  it('calls onRecord with blindIsPartner=true when 3 active players (auto-fill)', () => {
+  it('calls onRecord with blindIsPartner=true when Blind chip explicitly selected', () => {
     const onRecord = vi.fn()
     const frantsPlayers = [
       { id: 'p1', name: 'Alice', balance: 0 },
@@ -251,9 +247,27 @@ describe('Round screen - Frants', () => {
     const g = { ...makeGame('frants', { hasBlind: true }), players: frantsPlayers }
     render(<Round game={g} onRecord={onRecord} onBack={vi.fn()} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Blind' }))
     fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
     expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
       bids: [expect.objectContaining({ type: 'trick', bidderId: 'p1', blindIsPartner: true, partnerGaveUp: false })],
+    }))
+  })
+
+  it('calls onRecord with partnerGaveUp=true when Blind not selected as makker (blind is opponent)', () => {
+    const onRecord = vi.fn()
+    const frantsPlayers = [
+      { id: 'p1', name: 'Alice', balance: 0 },
+      { id: 'p2', name: 'Bob', balance: 0 },
+      { id: 'p3', name: 'Carol', balance: 0 },
+    ]
+    const g = { ...makeGame('frants', { hasBlind: true }), players: frantsPlayers }
+    render(<Round game={g} onRecord={onRecord} onBack={vi.fn()} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[0])
+    // Do NOT click Blind — blind is on opponent side
+    fireEvent.click(screen.getByRole('button', { name: /registrer/i }))
+    expect(onRecord).toHaveBeenCalledWith(expect.objectContaining({
+      bids: [expect.objectContaining({ type: 'trick', bidderId: 'p1', partnerGaveUp: true })],
     }))
   })
 
