@@ -14,7 +14,6 @@ const store = createStore()
 export default function App() {
   const [game, setGame] = useState<GameRecord | null>(store.getGame())
   const [screen, setScreen] = useState<Screen>(store.getGame() ? 'scoreboard' : 'setup')
-  const [lastActive, setLastActive] = useState<string[]>(['', '', '', ''])
   const [editingRound, setEditingRound] = useState<number | null>(null)
   const [autoExpandRound, setAutoExpandRound] = useState<number | null>(null)
   const [roundResult, setRoundResult] = useState<RoundResultData | null>(null)
@@ -47,21 +46,18 @@ export default function App() {
       <>
         <Round
           game={game}
-          defaultActive={lastActive}
           editingRoundIndex={editingRound}
           onRecord={input => {
             if (editingRound !== null) {
               store.editRound(editingRound, input)
               setAutoExpandRound(editingRound)
               setEditingRound(null)
-              setLastActive(input.activePlayers)
               refresh()
               setScreen('scoreboard')
             } else {
               store.recordRound(input)
               const g = store.getGame()
               setAutoExpandRound(g ? g.rounds.length - 1 : null)
-              setLastActive(input.activePlayers)
               refresh()
               // Show result popup instead of going to scoreboard
               const updatedGame = store.getGame()

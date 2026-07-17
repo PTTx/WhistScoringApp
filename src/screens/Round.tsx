@@ -4,7 +4,7 @@ import type { RecordRoundInput, TjellBidInput, FrantsBidInput, SolBidInput } fro
 
 interface Props {
   game: GameRecord
-  defaultActive?: string[]
+
   editingRoundIndex?: number | null
   onRecord: (input: RecordRoundInput) => void
   onBack: () => void
@@ -53,7 +53,7 @@ function s(id: string, players: GameRecord['players']) {
   return players.find(p => p.id === id)?.name ?? id
 }
 
-export default function Round({ game, defaultActive, editingRoundIndex, onRecord, onBack }: Props) {
+export default function Round({ game, editingRoundIndex, onRecord, onBack }: Props) {
   const editingRound = editingRoundIndex != null ? game.rounds[editingRoundIndex] : null
   const editingBid = editingRound?.bids[0] ?? null
   const { players, ruleset } = game

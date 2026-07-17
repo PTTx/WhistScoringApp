@@ -55,6 +55,7 @@ function roundSummary(round: RoundRecord, game: GameRecord) {
 
 export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRound, onEditRound, onEnd, autoExpandRound }: Props) {
   const [newName, setNewName] = useState('')
+  const [addingPlayer, setAddingPlayer] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(autoExpandRound ?? null)
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
   const [editingPlayerName, setEditingPlayerName] = useState('')
@@ -63,6 +64,7 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
     if (!newName.trim()) return
     onAddPlayer(newName.trim())
     setNewName('')
+    setAddingPlayer(false)
   }
 
   const sorted = [...game.players].sort((a, b) => b.balance - a.balance)
@@ -128,9 +130,35 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
         </tbody>
       </table>
 
-      <button onClick={onNewRound} style={{ width: '100%', padding: '0.75rem', fontSize: '1.1rem', marginBottom: '1.25rem' }}>
-        Ny runde
-      </button>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: addingPlayer ? '0.5rem' : '1.25rem' }}>
+        <button
+          onClick={() => setAddingPlayer(v => !v)}
+          style={{ padding: '0.65rem 0.9rem', fontSize: '0.95rem', background: 'var(--surface3)', flex: 'none' }}
+        >
+          + Ny spiller
+        </button>
+        <button onClick={onNewRound} style={{ flex: 1, padding: '0.75rem', fontSize: '1.1rem' }}>
+          Ny runde
+        </button>
+      </div>
+      {addingPlayer && (
+        <form
+          onSubmit={e => { e.preventDefault(); handleAdd() }}
+          style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}
+        >
+          <input
+            autoFocus
+            type="text"
+            placeholder="Spillernavn"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button type="submit" disabled={!newName.trim()}>Tilføj</button>
+          <button type="button" onClick={() => { setAddingPlayer(false); setNewName('') }}
+            style={{ background: 'var(--surface3)', color: 'var(--text-muted)' }}>✕</button>
+        </form>
+      )}
 
       {game.rounds.length > 0 && (
         <div style={{ marginBottom: '1.25rem' }}>
@@ -195,20 +223,6 @@ export default function Scoreboard({ game, onAddPlayer, onRenamePlayer, onNewRou
           })}
         </div>
       )}
-
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Nyt spillernavn"
-          value={newName}
-          onChange={e => setNewName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          style={{ flex: 1 }}
-        />
-        <button onClick={handleAdd} disabled={!newName.trim()}>
-          Tilføj
-        </button>
-      </div>
 
       <button
         onClick={onEnd}

@@ -64,21 +64,24 @@ describe('Scoreboard', () => {
   it('allows entering a new player name and calls onAddPlayer', () => {
     const onAddPlayer = vi.fn()
     render(<Scoreboard game={makeGame()} onAddPlayer={onAddPlayer} onRenamePlayer={vi.fn()} onNewRound={vi.fn()} onEditRound={vi.fn()} onEnd={vi.fn()} />)
-    fireEvent.change(screen.getByPlaceholderText(/nyt spillernavn/i), { target: { value: 'Eve' } })
+    fireEvent.click(screen.getByRole('button', { name: /ny spiller/i }))
+    fireEvent.change(screen.getByPlaceholderText(/spillernavn/i), { target: { value: 'Eve' } })
     fireEvent.click(screen.getByRole('button', { name: /tilføj/i }))
     expect(onAddPlayer).toHaveBeenCalledWith('Eve')
   })
 
   it('add player button is disabled when name input is empty', () => {
     render(<Scoreboard game={makeGame()} onAddPlayer={vi.fn()} onRenamePlayer={vi.fn()} onNewRound={vi.fn()} onEditRound={vi.fn()} onEnd={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: /ny spiller/i }))
     expect(screen.getByRole('button', { name: /tilføj/i })).toBeDisabled()
   })
 
-  it('clears the name input after adding a player', () => {
+  it('clears the name input and hides form after adding a player', () => {
     render(<Scoreboard game={makeGame()} onAddPlayer={vi.fn()} onRenamePlayer={vi.fn()} onNewRound={vi.fn()} onEditRound={vi.fn()} onEnd={vi.fn()} />)
-    const input = screen.getByPlaceholderText(/nyt spillernavn/i)
+    fireEvent.click(screen.getByRole('button', { name: /ny spiller/i }))
+    const input = screen.getByPlaceholderText(/spillernavn/i)
     fireEvent.change(input, { target: { value: 'Eve' } })
     fireEvent.click(screen.getByRole('button', { name: /tilføj/i }))
-    expect(input).toHaveValue('')
+    expect(screen.queryByPlaceholderText(/spillernavn/i)).not.toBeInTheDocument()
   })
 })
