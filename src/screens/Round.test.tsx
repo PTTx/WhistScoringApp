@@ -23,14 +23,14 @@ describe('Round screen - opponent selection with extra players', () => {
   it('shows selectable Modstandere when >4 players', () => {
     const game = makeGame('tjell', { players: [...PLAYERS, { id: 'p5', name: 'Eve', balance: 0 }] })
     render(<Round game={game} onRecord={vi.fn()} onBack={vi.fn()} />)
-    // Alice appears in Sidder over + Melder row; click the Melder one (index 1)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByText(/modstandere/i)).toBeInTheDocument()
   })
 
-  it('shows Sidder over chip section when >4 players', () => {
+  it('shows Sidder over text below Modstandere when >4 players', () => {
     const game = makeGame('tjell', { players: [...PLAYERS, { id: 'p5', name: 'Eve', balance: 0 }] })
     render(<Round game={game} onRecord={vi.fn()} onBack={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByText(/sidder over/i)).toBeInTheDocument()
   })
 })
@@ -233,7 +233,7 @@ describe('Round screen - Frants', () => {
 
   it('shows Blind chip when hasBlind and 4 active players', () => {
     render(<Round game={makeGame('frants', { hasBlind: true })} onRecord={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Alice' })[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Alice' }))
     expect(screen.getByRole('button', { name: 'Blind' })).toBeInTheDocument()
   })
 

@@ -63,46 +63,18 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const hasKat = !!game.hasKat
 
   const virtualPartner = hasKat || hasBlind
-  // Show Sidder over when there are more real players than always fit (4+ without virtual, 3+ with virtual)
-  const showSidderOver = players.length > (virtualPartner ? 3 : 4)
 
-  // --- Sitting out / active players ---
-  const initSittingOut: Set<string> = (() => {
-    if (editingRound) {
-      const active = new Set(editingRound.activePlayers)
-      return new Set(players.map(p => p.id).filter(id => !active.has(id)))
-    }
-    if (defaultActive && defaultActive.some(id => players.some(p => p.id === id))) {
-      const activeIds = new Set(defaultActive.filter(id => players.some(p => p.id === id)))
-      return new Set(players.map(p => p.id).filter(id => !activeIds.has(id)))
-    }
-    return new Set<string>()
-  })()
-
-  const [sittingOut, setSittingOut] = useState<Set<string>>(initSittingOut)
-
-  function toggleSittingOut(id: string) {
-    setSittingOut(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-    if (!sittingOut.has(id)) {
-      if (melderId === id) setMelderId('')
-      if (partnerId === id) setPartnerId('')
-    }
-  }
-
-  const activePlayers = players.filter(p => !sittingOut.has(p.id)).map(p => p.id)
-  const activeCount = activePlayers.length
-  // Kat fills the 4th seat only in Tjell when exactly 3 real players are active
+  // All players always available — no interactive sitting-out toggle
+  const activePlayers = players.map(p => p.id)
+  const activeCount = players.length
+  // Kat fills the 4th seat only in Tjell when exactly 3 real players
   const katInPlay = hasKat && activeCount === 3
-  // Blind fills the 4th seat only in Frants when exactly 3 real players are active
+  // Blind fills the 4th seat only in Frants when exactly 3 real players
   const blindInPlay = hasBlind && activeCount === 3
-  const effectiveSeats = (katInPlay || blindInPlay) ? 4 : activeCount
+  // Game is always 4-handed (virtual or real players fill the seats)
+  const effectiveSeats = 4
   const activeFilled = activeCount >= (virtualPartner ? 3 : 4)
-  // Selectable opponents mode: more players available than seats
+  // Selectable opponents mode: more players than fit in a 4-seat game
   const hasExtraPlayers = players.length > (virtualPartner ? 3 : 4)
 
   // --- Sol type ---
@@ -160,34 +132,42 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   }
 
   // --- Derived ---
-  const katIsPartner = katInPlay
-  // blindIsPartner: explicit Blind chip selection only
+  // Kat: auto-partner when 3 real players; selectable when hasExtraPlayers
+  const katIsPartner = katInPlay || partnerId === 'kat'
+  // Blind: explicit selection only
   const blindIsPartner = partnerId === 'blind'
   const partnerGaveUp = !katIsPartner && !blindIsPartner && partnerId === ''
   const realPartnerId = (!katIsPartner && !blindIsPartner && partnerId !== '') ? partnerId : null
 
-  // Opponents: when hasExtraPlayers use selectedOpponents, otherwise derive from active
+  // Kat chip: always show when hasKat (disabled+selected when katInPlay, selectable when extra players)
+  const showKatChip = hasKat
+  // Blind chip: show when hasBlind (always selectable)
+  const showBlindChip = isFrants && hasBlind
+
+  // Players available to select as opponents (exclude melder and real partner)
+  const opponentCandidates = activePlayers.filter(id => id !== melderId && id !== realPartnerId)
+
+  // Opponents: selectedOpponents when hasExtraPlayers, otherwise all non-melder/partner
   const opponentIds: string[] = hasExtraPlayers && !isSol
     ? [...selectedOpponents].filter(id => id !== melderId && id !== realPartnerId)
     : activePlayers.filter(id => id !== melderId && id !== realPartnerId)
 
-  // Required real opponents = total seats - bidder seat - partner seat (real or virtual)
+  // Required real opponents = total seats - bidder - partner seat
   const hasPartnerSeat = realPartnerId != null || katIsPartner || blindIsPartner
   const requiredOppCount = effectiveSeats - 1 - (hasPartnerSeat ? 1 : 0)
 
-  // Blind chip: always show as a selectable makker option when Frants + hasBlind
-  const showBlindChip = isFrants && hasBlind
-  // Kat chip: show when Kat is in play (3 active real players with hasKat)
-  const showKatChip = katInPlay
-
-  const makkerOptions: { id: string; label: string }[] = melderId && !isSol
+  const makkerOptions: { id: string; label: string }[] = melderId && !isSol && !showKatChip
     ? [
-        ...(showKatChip
-          ? []
-          : activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) }))),
+        ...activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) })),
         ...(showBlindChip ? [{ id: 'blind', label: 'Blind' }] : []),
       ]
-    : []
+    : melderId && !isSol && showKatChip && hasExtraPlayers
+      ? [
+          { id: 'kat', label: 'Kat' },
+          ...activePlayers.filter(id => id !== melderId).map(id => ({ id, label: s(id, players) })),
+          ...(showBlindChip ? [{ id: 'blind', label: 'Blind' }] : []),
+        ]
+      : []
 
   const halve = godeHalve
   const godeForTjell = (godeKlorSans ? 1 : 0) + (godeHalve ? 1 : 0)
@@ -197,8 +177,27 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
   const halveDisabled = vipFlips > 0
   const vipDisabled = (isTjell && halve) || (isFrants && godeKlorSans)
 
-  // Sidder over read-only label (shown below selectable-opponents when extra players)
-  const sidderOverNames = players.filter(p => sittingOut.has(p.id)).map(p => p.name)
+  // Sidder over (read-only, shown below Modstandere when hasExtraPlayers)
+  // Players not assigned a seat + any virtual entity not used this round
+  const playingRealIds = new Set([
+    ...(melderId ? [melderId] : []),
+    ...(realPartnerId ? [realPartnerId] : []),
+    ...opponentIds,
+  ])
+  const sidderOverLabels: string[] = [
+    ...players.filter(p => !playingRealIds.has(p.id)).map(p => p.name),
+    ...(hasKat && !katIsPartner ? ['Kat'] : []),
+    ...(hasBlind && !blindIsPartner && !blindInPlay ? ['Blind makker'] : []),
+  ]
+
+  // activePlayers for the record: those actually playing (4 seats)
+  const recordActivePlayers = hasExtraPlayers
+    ? [
+        ...(melderId ? [melderId] : []),
+        ...(realPartnerId ? [realPartnerId] : []),
+        ...opponentIds,
+      ]
+    : activePlayers
 
   // canRecord
   const opponentsFilled = !hasExtraPlayers || opponentIds.length >= requiredOppCount
@@ -216,7 +215,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         { type: 'sol', solPlayerId: melderId, solType: solType!, won: solWon === true },
         ...(solMakkerId ? [{ type: 'sol' as const, solPlayerId: solMakkerId, solType: solType!, won: solMakkerWon === true }] : []),
       ]
-      onRecord({ activePlayers, partnerships, bids: solBids })
+      onRecord({ activePlayers: recordActivePlayers, partnerships, bids: solBids })
     } else if (isTjell) {
       const bid: TjellBidInput = {
         type: 'trick',
@@ -230,7 +229,7 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         partnerGaveUp: !katIsPartner && partnerGaveUp,
         ...(katIsPartner ? { katIsPartner: true } : {}),
       }
-      onRecord({ activePlayers, partnerships, bids: [bid] })
+      onRecord({ activePlayers: recordActivePlayers, partnerships, bids: [bid] })
     } else {
       const bid: FrantsBidInput = {
         type: 'trick',
@@ -243,12 +242,9 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         partnerGaveUp,
         ...(blindIsPartner ? { blindIsPartner: true } : {}),
       }
-      onRecord({ activePlayers, partnerships, bids: [bid] })
+      onRecord({ activePlayers: recordActivePlayers, partnerships, bids: [bid] })
     }
   }
-
-  // Players available to select as opponents (exclude melder and partner)
-  const opponentCandidates = activePlayers.filter(id => id !== melderId && id !== realPartnerId && id !== partnerId)
 
   return (
     <div style={{ padding: '1rem', maxWidth: 440 }}>
@@ -256,18 +252,6 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
         ← Tilbage
       </button>
       <h2>{editingRound ? 'Rediger runde' : 'Ny runde'}</h2>
-
-      {/* Sidder over — shown when virtualPartner (Kat/Blind) or more than 4 players */}
-      {showSidderOver && (
-        <div style={{ background: 'var(--surface)', borderRadius: 8, marginBottom: '1rem', padding: '0.55rem 0.75rem' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Sidder over</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-            {players.map(p => (
-              <Chip key={p.id} label={p.name} selected={sittingOut.has(p.id)} onClick={() => toggleSittingOut(p.id)} />
-            ))}
-          </div>
-        </div>
-      )}
 
       <fieldset>
         <legend>Melding</legend>
@@ -314,12 +298,12 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
           </div>
         )}
 
-        {/* Makker (trick mode) — Kat shown as fixed/disabled chip */}
+        {/* Makker (trick mode) */}
         {!isSol && melderId && (
           <div style={{ marginBottom: '0.65rem' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Makker</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {showKatChip ? (
+              {katInPlay ? (
                 <Chip label="Kat" selected={true} disabled={true} onClick={() => {}} color="green" />
               ) : (
                 makkerOptions.map(opt => (
@@ -353,9 +337,9 @@ export default function Round({ game, defaultActive, editingRoundIndex, onRecord
                     />
                   ))}
                 </div>
-                {sidderOverNames.length > 0 && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                    Sidder over: {sidderOverNames.join(', ')}
+                {sidderOverLabels.length > 0 && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                    Sidder over: {sidderOverLabels.join(', ')}
                   </div>
                 )}
               </>
